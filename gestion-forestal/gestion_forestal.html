@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Gestión Forestal y Medio Natural</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f1f4ef;color:#20352a;font:16px system-ui,sans-serif}header{background:#153b2d;color:white;padding:3rem max(5vw,1rem) 2rem}header p{color:#bad7c5;margin:0}h1{margin:.4rem 0;font-size:clamp(1.7rem,5vw,3rem)}main{max-width:1120px;margin:auto;padding:1.5rem 1rem}nav,.bar,.actions{display:flex;gap:.65rem;flex-wrap:wrap;align-items:center}nav{border-bottom:1px solid #cbd7ce;padding-bottom:.75rem}.bar{margin:1rem 0}.bar input{flex:1;min-width:12rem}input,select,textarea,button{font:inherit;border:1px solid #aebfb4;border-radius:8px;padding:.65rem;background:white;color:inherit}button,summary{cursor:pointer}button.primary,button[aria-pressed=true]{background:#215b42;color:white;border-color:#215b42}details,.card{background:white;border:1px solid #d3ded5;border-radius:12px;margin:.65rem 0;padding:1rem}summary{font-weight:700}small,dt,.muted{color:#52675b}dl,.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:1rem}dt{font-size:.85rem}dd{margin:.25rem 0 0;white-space:pre-wrap;overflow-wrap:anywhere}label{display:grid;gap:.3rem;font-weight:600}label>*{width:100%;min-width:0;font-weight:400}dialog{width:min(860px,94vw);border:1px solid #cad9cf;border-radius:14px;color:inherit}dialog::backdrop{background:#12281cb0}fieldset{border:1px solid #cad9cf;border-radius:8px;margin:1rem 0}.money{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem}.money input{width:9rem;max-width:100%}.actions{margin-top:1rem}#error{color:#a31c27}
+*{box-sizing:border-box}body{margin:0;background:#f1f4ef;color:#20352a;font:16px system-ui,sans-serif}header{background:#153b2d;color:white;padding:3rem max(5vw,1rem) 2rem}header p{color:#bad7c5;margin:0}h1{margin:.4rem 0;font-size:clamp(1.7rem,5vw,3rem)}main{max-width:1120px;margin:auto;padding:1.5rem 1rem}nav,.bar,.actions{display:flex;gap:.65rem;flex-wrap:wrap;align-items:center}nav{border-bottom:1px solid #cbd7ce;padding-bottom:.75rem}.bar{margin:1rem 0}.bar input{flex:1;min-width:12rem}input,select,textarea,button{font:inherit;border:1px solid #aebfb4;border-radius:8px;padding:.65rem;background:white;color:inherit}button,summary{cursor:pointer}button.primary,button[aria-pressed=true]{background:#215b42;color:white;border-color:#215b42}details,.card{background:white;border:1px solid #d3ded5;border-radius:12px;margin:.65rem 0;padding:1rem}summary{font-weight:700}small,dt,.muted{color:#52675b}dl,.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:1rem}dt{font-size:.85rem}dd{margin:.25rem 0 0;white-space:pre-wrap;overflow-wrap:anywhere}label{display:grid;gap:.3rem;font-weight:600}label>*{width:100%;min-width:0;font-weight:400}dialog{width:min(980px,96vw);border:1px solid #cad9cf;border-radius:14px;color:inherit}dialog::backdrop{background:#12281cb0}fieldset{border:1px solid #cad9cf;border-radius:8px;margin:1rem 0}.money{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem}.money input{width:9rem;max-width:100%}.actions{margin-top:1rem}#error{color:#a31c27}.wide{grid-column:1/-1}textarea{resize:vertical}.action-block{border:1px solid #cad9cf;border-radius:10px;padding:.75rem;margin:.6rem 0;background:#f7faf6}.action-head{display:grid;grid-template-columns:minmax(8rem,12rem) 1fr;gap:.75rem;margin-bottom:.6rem}@media(max-width:560px){.action-head{grid-template-columns:1fr}}.years{margin:.4rem 0}.job-actions{margin-top:1rem;border-top:1px solid #e1e9e3;padding-top:.75rem}.job-action{margin:.5rem 0;padding:.6rem .8rem;border-left:4px solid #215b42;background:#f7faf6;border-radius:6px}.job-action ul{margin:.3rem 0 0;padding-left:1.2rem}.total{font-weight:700}
 </style>
 <header><p>GPEX · Registro del área</p><h1>Gestión Forestal y Medio Natural</h1><p>Encargos y personal adscrito</p></header>
 <main>
@@ -16,7 +16,7 @@
 </main>
 <dialog id="editor" aria-labelledby="title"><form id="form">
 <h2 id="title"></h2><div id="fields" class="fields"></div>
-<fieldset id="budget"><legend>Importe por anualidad (€)</legend><div id="years"></div><button type="button" id="addYear">Añadir anualidad</button></fieldset>
+<fieldset id="budget"><legend>Acciones del encargo y presupuesto por anualidad (€)</legend><div id="actionsList"></div><button type="button" id="addAction">Añadir acción</button></fieldset>
 <p id="error" role="alert"></p><div class="actions"><button class="primary">Guardar</button><button type="button" id="cancel">Cancelar</button></div>
 </form></dialog>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -36,11 +36,20 @@ const firebaseConfig = {
 const collections = {jobs:'gf_encargos', staff:'gf_adscripciones'};
 const byId = id => document.getElementById(id);
 const schema = [
- ['exp','Nº expediente'],['name','Nombre'],['code','Código encargo'],['action','Código acción'],
+ ['name','Nombre del encargo','long'],['exp','Nº expediente'],['code','Código encargo'],['fund','Fondo'],
  ['service','Órgano gestor (servicio)'],['chief','Jefe de servicio'],['department','Consejería y director general'],
  ['director','Director de los trabajos del encargo'],['start','Fecha de inicio','date'],['end','Fecha de fin','date'],
- ['fund','Fondo'],['notes','Incidencias','textarea']
+ ['notes','Incidencias','long']
 ];
+// Acciones del encargo: [{code, name, years:[{year, amount}]}].
+// Los encargos guardados con el formato antiguo (un solo código de acción + anualidades) se leen como una acción.
+function jobActions(job){
+ if(Array.isArray(job.actions)) return job.actions;
+ if(job.action||(job.years||[]).length) return [{code:job.action||'',name:'',years:job.years||[]}];
+ return [];
+}
+const sum=years=>(years||[]).reduce((t,row)=>t+(Number(row.amount)||0),0);
+function actionLabel(a){return [a.code,a.name].filter(Boolean).join(' · ')||'Acción sin código';}
 const key = 'gpex-gestion-forestal-v1';
 const euro = new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'});
 let mode = 'jobs', editing, initialJob;
@@ -119,6 +128,7 @@ async function importLocal(){
 function definition(list,label,value){
  const group=node('div',undefined,list);
  node('dt',label,group); node('dd',value || '—',group);
+ return group;
 }
 function normalize(value){
  return value.normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase();
@@ -136,7 +146,7 @@ function show(){
  const jobs=new Map(data.jobs.map(job=>[job.id,job]));
  if(!ready){if(db) byId('status').textContent=dbError||'Conectando con Firebase…';return;}
  const result=data[mode].filter(item=>{
-  const text=mode==='jobs'?[item.name,item.code,item.exp,item.action]:[item.name,jobLabel(jobs.get(item.job)||{}),item.role];
+  const text=mode==='jobs'?[item.name,item.code,item.exp,...jobActions(item).flatMap(a=>[a.code,a.name])]:[item.name,jobLabel(jobs.get(item.job)||{}),item.role];
   return normalize(text.join(' ')).includes(query);
  }).sort((a,b)=>(a.name||'').localeCompare(b.name||'','es'));
  byId('status').textContent=result.length ? result.length+' '+(mode==='jobs'?(result.length===1?'encargo':'encargos'):(result.length===1?'adscripción':'adscripciones')) : (query?'Sin resultados':mode==='jobs'?'Todavía no hay encargos.':data.jobs.length?'Todavía no hay personal adscrito.':'Da de alta un encargo para asignarle personal.');
@@ -147,9 +157,19 @@ function show(){
    const list=node('dl',undefined,card);
    for(const [id,label,type] of schema){
     const value=item[id];
-    definition(list,label,type==='date'&&value?value.split('-').reverse().join('/'):value);
-    if(id==='action') definition(list,'Importe por anualidad',(item.years||[]).map(row=>row.year+' · '+euro.format(row.amount)).join('\n'));
+    const g=definition(list,label,type==='date'&&value?value.split('-').reverse().join('/'):value);
+    if(type==='long') g.className='wide';
    }
+   const acts=jobActions(item), box=node('div',undefined,card); box.className='job-actions';
+   node('strong',acts.length?'Acciones ('+acts.length+')':'Sin acciones registradas',box);
+   for(const a of acts){
+    const el=node('div',undefined,box); el.className='job-action';
+    node('div',actionLabel(a),el).style.fontWeight='600';
+    const ul=node('ul',undefined,el);
+    for(const row of a.years||[]) node('li',row.year+': '+euro.format(row.amount),ul);
+    if((a.years||[]).length>1) node('div','Total acción: '+euro.format(sum(a.years)),el).className='total';
+   }
+   if(acts.length) node('p','Total del encargo: '+euro.format(acts.reduce((t,a)=>t+sum(a.years),0)),box).className='total';
    const actions=node('div',undefined,card); actions.className='actions';
    button('Editar encargo',actions,()=>openEditor(item));
    button('Ver personal',actions,()=>switchMode('staff',jobLabel(item)));
@@ -169,15 +189,27 @@ function show(){
 function switchMode(next,query=''){
  mode=next;byId('search').value=query;show();
 }
-function addMoney(row={}){
- const line=node('div',undefined,byId('years'));line.className='money';
+function addMoney(container,row={}){
+ const line=node('div',undefined,container);line.className='money';
  for(const [name,label,min,max,step] of [['year','Año',1900,9999,1],['amount','Importe (€)',0,null,0.01]]){
   const input=node('input',undefined,line);input.name=name;input.type='number';
   input.placeholder=label;input.setAttribute('aria-label',label);
-  input.required=true;input.min=min;input.step=step;if(max) input.max=max;
+  input.min=min;input.step=step;if(max) input.max=max;
   input.value=row[name]??'';
  }
- button('Quitar',line,()=>line.remove());
+ button('Quitar anualidad',line,()=>line.remove());
+}
+function addAction(a={}){
+ const block=node('div',undefined,byId('actionsList'));block.className='action-block';
+ const head=node('div',undefined,block);head.className='action-head';
+ const l1=node('label','Código acción',head);const code=node('input',undefined,l1);code.name='acode';code.value=a.code||'';
+ const l2=node('label','Nombre de la acción',head);const name=node('textarea',undefined,l2);name.name='aname';name.rows=2;name.value=a.name||'';
+ const years=node('div',undefined,block);years.className='years';
+ for(const row of a.years||[]) addMoney(years,row);
+ if(!(a.years||[]).length) addMoney(years);
+ const bar=node('div',undefined,block);bar.className='actions';bar.style.marginTop='.25rem';
+ button('Añadir anualidad',bar,()=>addMoney(years));
+ button('Quitar acción',bar,()=>{ if(confirm('¿Quitar esta acción y sus anualidades?')) block.remove(); });
 }
 function openEditor(item,job){
  editing=item; initialJob=job;
@@ -187,9 +219,11 @@ function openEditor(item,job){
  const definitions=mode==='jobs'?schema:[['name','Nombre y apellidos'],['job','Encargo','select'],['role','Puesto o función']];
  for(const [id,label,type] of definitions){
   const wrap=node('label',label,fields);
-  const input=node(type==='textarea'||type==='select'?type:'input',undefined,wrap);
+  if(type==='long') wrap.className='wide';
+  const input=node(type==='long'||type==='select'?(type==='long'?'textarea':'select'):'input',undefined,wrap);
+  if(type==='long') input.rows=2;
   input.name=id;
-  if(input.tagName==='INPUT') input.type=type||'text';
+  if(input.tagName==='INPUT') input.type=type==='date'?'date':'text';
   if(type==='select'){
    for(const job of data.jobs){
     const option=node('option',jobLabel(job),input);option.value=job.id;
@@ -198,8 +232,12 @@ function openEditor(item,job){
   input.required=id==='name'||id==='job';
   input.value=item?.[id]??(id==='job'?initialJob||data.jobs[0]?.id||'':'');
  }
- byId('budget').hidden=mode!=='jobs';byId('years').replaceChildren();
- for(const row of item?.years||[]) addMoney(row);
+ byId('budget').hidden=mode!=='jobs';byId('actionsList').replaceChildren();
+ if(mode==='jobs'){
+  const acts=item?jobActions(item):[];
+  for(const a of acts) addAction(a);
+  if(!acts.length) addAction();
+ }
  byId('editor').showModal();
 }
 byId('form').onsubmit=async event=>{
@@ -209,10 +247,21 @@ byId('form').onsubmit=async event=>{
  if(!values.name) return error('Introduce un nombre.');
  if(mode==='jobs'){
   if(values.start&&values.end&&values.end<values.start) return error('La fecha de fin debe ser igual o posterior a la de inicio.');
-  values.years=Array.from(byId('years').children,line=>({
-   year:Number(line.querySelector('[name=year]').value),amount:Number(line.querySelector('[name=amount]').value)
-  })).sort((a,b)=>a.year-b.year);
-  if(new Set(values.years.map(row=>row.year)).size!==values.years.length) return error('Introduce un único importe por año.');
+  values.actions=[];
+  for(const block of byId('actionsList').children){
+   const code=block.querySelector('[name=acode]').value.trim(), name=block.querySelector('[name=aname]').value.trim();
+   const years=[];
+   for(const line of block.querySelectorAll('.money')){
+    const y=line.querySelector('[name=year]').value, m=line.querySelector('[name=amount]').value;
+    if(!y&&!m) continue;
+    if(!y||m==='') return error('Cada anualidad necesita año e importe ('+(code||name||'acción sin código')+').');
+    years.push({year:Number(y),amount:Number(m)});
+   }
+   if(!code&&!name&&!years.length) continue;
+   years.sort((a,b)=>a.year-b.year);
+   if(new Set(years.map(row=>row.year)).size!==years.length) return error('La acción '+(code||name)+' tiene dos importes para el mismo año.');
+   values.actions.push({code,name,years});
+  }
  }
  const record={...values,id:editing?.id||globalThis.crypto.randomUUID()};
  const btn=byId('form').querySelector('button.primary');btn.disabled=true;
@@ -229,7 +278,7 @@ byId('add').onclick=()=>{
  openEditor();
 };
 byId('cancel').onclick=()=>byId('editor').close();
-byId('addYear').onclick=()=>addMoney();
+byId('addAction').onclick=()=>addAction();
 byId('import').onclick=importLocal;
 show();
 startFirebase();
