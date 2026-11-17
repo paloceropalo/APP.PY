@@ -1,32 +1,231 @@
-// Reglas para Gestión Forestal SIN inicio de sesión.
-// IMPORTANTE: el proyecto cuadrante-secona ya tiene reglas (gestor de vehículos).
-// No sustituyas las existentes: copia sólo los dos bloques "match" de abajo
-// dentro de "match /databases/{database}/documents { ... }" en
-// Firebase Console → Firestore Database → Reglas, y pulsa Publicar.
-
 rules_version = '2';
+
+// Reglas de Firestore del proyecto cuadrante-secona
+// (Gestor de Vehículos + Formularios GPEX + Gestión Forestal).
+//
+// GESTOR DE VEHÍCULOS
+// - Administrador = la cuenta de "Acceso administrador", identificada por su UID
+//   (indicado abajo en esAdmin). Puede hacer de todo en el gestor.
+// - Trabajadores: no inician sesión. Pueden ver los datos, crear sus reservas,
+//   completar/corregir hojas de ruta y eliminar reservas aún no completadas.
+//   No pueden tocar trabajadores, vehículos, encargos, tareas ni ajustes.
+//
+// FORMULARIOS GPEX
+// - Administrador = tu cuenta de Google (esAdminFormularios).
+// - Trabajadores: sesión anónima automática. Solo pueden abrir un formulario
+//   abierto y enviar respuestas; nunca leerlas.
+//
+// GESTIÓN FORESTAL (gestion_forestal.html)
+// - Sin inicio de sesión: quien tenga el enlace puede ver y editar
+//   los encargos (gf_encargos) y el personal adscrito (gf_adscripciones).
+//
+// IMPORTANTE: como este proyecto tiene activado el acceso anónimo y con Google,
+// "haber iniciado sesión" ya NO basta para ser administrador: se exige el correo.
+//
+// Publicar:  firebase deploy --only firestore:rules
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Encargos
-    match /gf_encargos/{id} {
+    // Administrador del gestor de vehículos (UID de su cuenta en Authentication).
+    function esAdmin() {
+      return request.auth != null
+        && request.auth.uid == 'o6213lWxJEgklDVJoyShTBpkvkY2';
+    }
+
+    // ⚠️ Cambia por tu correo de Google (el mismo que ADMIN_EMAILS en formularios_gpex.html).
+    function esAdminFormularios() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['paloceropalo@gmail.com'];
+    }
+
+    function leer(coleccion, id) {
+      return get(/databases/$(database)/documents/$(coleccion)/$(id));
+    }
+
+    // ===================== GESTOR DE VEHÍCULOS =====================
+
+    // Datos maestros: todos leen, solo el administrador escribe.
+    match /workers/{id}  { allow read: if true; allow write: if esAdmin(); }
+    match /vehicles/{id} { allow read: if true; allow write: if esAdmin(); }
+    match /tareas/{id}   { allow read: if true; allow write: if esAdmin(); }
+    match /config/{id}   { allow read: if true; allow write: if esAdmin(); }
+    match /encargos/{id} { allow read: if true; allow write: if esAdmin(); }
+
+    match /reservations/{id} {
       allow read: if true;
-      allow delete: if true;
+      allow create: if esAdmin() || reservaNuevaValida();
+      allow update: if esAdmin() || hojaDeRutaValida();
+      allow delete: if esAdmin() || resource.data.estado != 'completado';
+
+      // Nueva reserva hecha por un trabajador: tal y como la crea la app,
+      // de un trabajador y un vehículo que existen y son del mismo encargo.
+      function reservaNuevaValida() {
+        let d = request.resource.data;
+        let w = leer('workers', d.workerId).data;
+        let v = leer('vehicles', d.vehicleId).data;
+        let encW = w.get('encargo', '');
+        let encV = v.get('encargo', '');
+        return d.keys().hasOnly(['vehicleId', 'matricula', 'fecha', 'horaInicio', 'horaFin',
+                                 'workerId', 'workerName', 'estado', 'createdAt'])
+          && d.estado == 'reservado'
+          && d.fecha is string
+          && d.horaInicio is string && d.horaFin is string && d.horaInicio < d.horaFin
+          && d.createdAt == request.time
+          && d.workerName == w.nombre
+          && d.matricula == v.matricula
+          && (encW == '' || encV == '' || encW == encV);
+      }
+
+      // Completar o corregir una hoja de ruta (y el recálculo automático de
+      // "provisional"): solo cambian los datos del viaje; quién, qué vehículo
+      // y qué día no se pueden modificar.
+      function hojaDeRutaValida() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                 'estado', 'horaSalida', 'kmSalida', 'destino', 'fechaLlegada', 'horaLlegada',
+                 'kmLlegada', 'kmRepostaje', 'observaciones', 'provisional', 'provisionalMotivo'])
+          && request.resource.data.estado == 'completado';
+      }
+    }
+
+    // ======================= FORMULARIOS GPEX =======================
+
+    // Plantillas de formulario guardadas por el administrador.
+    match /modelos/{id} {
+      allow read, write: if esAdminFormularios();
+    }
+
+    // Direcciones cortas: /formulario/<slug> → ID del formulario.
+    match /slugs/{slug} {
+      allow get: if request.auth != null;
+      allow list, create, update, delete: if esAdminFormularios();
+    }
+
+    match /formularios/{formId} {
+      function formulario() {
+        return get(/databases/$(database)/documents/formularios/$(formId)).data;
+      }
+      function rutaDest(t) {
+        return /databases/$(database)/documents/formularios/$(formId)/destinatarios/$(t);
+      }
+
+      // Un trabajador solo puede abrir un formulario concreto si está abierto.
+      allow get: if esAdminFormularios()
+        || (request.auth != null && resource.data.abierto == true);
+      allow list, create, update, delete: if esAdminFormularios();
+
+      // Destinatarios: el ID es el código secreto del enlace personal.
+      // Quien tiene el enlace puede leer SU ficha (nombre y correo), pero nadie
+      // salvo el administrador puede listarlas ni modificarlas.
+      match /destinatarios/{token} {
+        allow get: if request.auth != null;
+        allow list, create, update, delete: if esAdminFormularios();
+      }
+
+      // Índice correo → código, solo para formularios con identificación por correo.
+      // Permite consultar UN correo concreto, nunca listar la lista entera.
+      match /porCorreo/{email} {
+        allow get: if request.auth != null
+          && formulario().get('identificacion', 'enlace') == 'correo';
+        allow list, create, update, delete: if esAdminFormularios();
+      }
+
+      // Adjuntos troceados: un documento con los datos del archivo y sus trozos.
+      // Los trabajadores solo pueden CREARLOS antes de enviar su respuesta; nunca leerlos.
+      match /archivos/{aid} {
+        function nuevo() { return request.resource.data; }
+        allow create: if request.auth != null
+          && formulario().abierto == true
+          && formulario().get('adjuntosPausados', false) != true
+          && nuevo().keys().hasOnly(['respId', 'qid', 'nombre', 'tipo', 'tam', 'trozos', 'uid', 'creado'])
+          && nuevo().uid == request.auth.uid
+          && nuevo().creado == request.time
+          && nuevo().respId is string && nuevo().qid is string
+          && nuevo().nombre is string && nuevo().nombre.size() <= 200
+          && nuevo().tam is int && nuevo().tam > 0 && nuevo().tam <= 5242880
+          && nuevo().trozos is int && nuevo().trozos >= 1 && nuevo().trozos <= 10
+          && nuevo().tipo is string
+          && nuevo().tipo.matches('application/pdf|image/.*|application/msword|application/vnd[.]openxmlformats-officedocument[.].*|application/vnd[.]ms-excel|application/vnd[.]oasis[.]opendocument[.].*')
+          && !exists(/databases/$(database)/documents/formularios/$(formId)/respuestas/$(nuevo().respId))
+          && (exists(rutaDest(nuevo().respId)) || formulario().get('enlaceGeneral', false) == true);
+        allow read, update, delete: if esAdminFormularios();
+
+        match /trozos/{n} {
+          function meta() {
+            return get(/databases/$(database)/documents/formularios/$(formId)/archivos/$(aid)).data;
+          }
+          allow create: if request.auth != null
+            && meta().uid == request.auth.uid
+            && !exists(/databases/$(database)/documents/formularios/$(formId)/respuestas/$(meta().respId))
+            && n.matches('[0-9]+') && int(n) < meta().trozos
+            && request.resource.data.keys().hasOnly(['d'])
+            && request.resource.data.d is string && request.resource.data.d.size() <= 700000;
+          allow read, delete: if esAdminFormularios();
+        }
+      }
+
+      match /respuestas/{respId} {
+        function base() {
+          let d = request.resource.data;
+          return request.auth != null
+            && formulario().abierto == true
+            && d.keys().hasOnly(['respuestas', 'enviado', 'uid', 'tipo', 'nombre', 'email', 'bytesAdjuntos'])
+            && d.respuestas is map
+            && (!('bytesAdjuntos' in d) || (d.bytesAdjuntos is int && d.bytesAdjuntos >= 0 && d.bytesAdjuntos <= 60000000))
+            && d.uid == request.auth.uid
+            && d.enviado == request.time;
+        }
+        // Respuesta con enlace personal: el ID es el código del destinatario
+        // (una sola respuesta por persona) y nombre/correo deben ser los suyos.
+        function personal() {
+          let d = request.resource.data;
+          return d.tipo == 'personal'
+            && exists(rutaDest(respId))
+            && d.nombre == get(rutaDest(respId)).data.nombre
+            && d.email == get(rutaDest(respId)).data.email;
+        }
+        // Respuesta por enlace general (solo si el formulario lo permite).
+        function general() {
+          let d = request.resource.data;
+          return d.tipo == 'general'
+            && formulario().get('enlaceGeneral', false) == true
+            && !exists(rutaDest(respId))
+            && d.nombre is string && d.nombre.size() >= 3 && d.nombre.size() <= 120
+            && d.email is string && d.email.size() <= 120 && d.email.matches('[^@ ]+@[^@ ]+[.][^@ ]+');
+        }
+
+        allow create: if base() && (personal() || general());
+        // El trabajador puede volver a ver su propia respuesta con su enlace personal,
+        // pero NO en el modo "por correo": ahí cualquiera podría escribir el correo
+        // de otro y leer lo que contestó.
+        allow get: if esAdminFormularios()
+          || (request.auth != null
+              && formulario().get('identificacion', 'enlace') != 'correo'
+              && exists(rutaDest(respId)));
+        allow list, update, delete: if esAdminFormularios();
+      }
+    }
+
+    // ================= GESTIÓN FORESTAL (gestion_forestal.html) =================
+    // Sin inicio de sesión: quien tenga el enlace puede ver y editar.
+    match /gf_encargos/{id} {
+      allow read, delete: if true;
       allow create, update: if request.resource.data.id == id
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
         && request.resource.data.name.size() <= 1000;
     }
-
-    // Personal adscrito
     match /gf_adscripciones/{id} {
-      allow read: if true;
-      allow delete: if true;
+      allow read, delete: if true;
       allow create, update: if request.resource.data.id == id
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
-        && request.resource.data.name.size() < 500
+        && request.resource.data.name.size() <= 300
         && request.resource.data.job is string;
     }
+
+    // Cualquier otra colección queda cerrada.
   }
 }
