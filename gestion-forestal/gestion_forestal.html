@@ -143,6 +143,31 @@ details[open]>dl{background:#f3f6ee;border-bottom:1px solid #dfe7d3}
 details>.actions{background:#fff}
 .crono th.c-now-h{position:relative;overflow:visible}.crono th.c-now-h:before{content:'▼';position:absolute;left:50%;top:-13px;transform:translateX(-50%);color:#bc534a;font-size:10px;line-height:1;z-index:2;pointer-events:none}
 .masthead-side{display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:flex-end}.masthead-side .connection{margin-top:0}main>.workspace{margin-top:24px}main>.metrics{margin:28px 0 0}@media(max-width:560px){.masthead{flex-wrap:wrap;gap:10px}.masthead-side{width:100%;justify-content:flex-start}}
+
+/* ===== Cronograma tipo Gantt (compacto) ===== */
+.gantt-wrap{overflow-x:auto;border:1px solid #d9e0d0;border-radius:8px;margin-top:14px;background:#fff}
+.gantt{display:grid;font-size:.74rem;position:relative}
+.g-cell{border-bottom:1px solid #edf1e8;min-width:0}
+.g-name,.g-end{position:sticky;z-index:3;background:#fff}
+.g-name{left:0;padding:5px 12px}.g-end{left:var(--lw);padding:5px 10px;border-right:1px solid #dfe5d6;display:flex;flex-direction:column;justify-content:center;line-height:1.25}
+.g-head{background:#f5f7f1!important;color:#6a755d;font-size:.66rem;font-weight:600;letter-spacing:.03em;text-transform:uppercase;display:flex;align-items:flex-end;padding-bottom:6px;border-bottom:1px solid #d9e0d0}
+.g-head.g-time{display:block;padding:0}
+.g-years{display:grid;grid-template-columns:repeat(var(--years),minmax(0,1fr))}.g-years span{text-align:center;padding:4px 0;font-size:.74rem;color:#4b5b3c;border-left:1px solid #dfe5d6;letter-spacing:0}.g-years span.cur{background:#e4edcf;color:#3c551a}
+.g-months{display:grid;grid-template-columns:repeat(var(--months),minmax(0,1fr))}.g-months span{text-align:center;font-size:.55rem;padding:2px 0 4px;color:#7b8474;letter-spacing:0;position:relative;overflow:hidden}.g-months span:nth-child(12n+1){border-left:1px solid #dfe5d6}
+.g-months span.now{background:#f6dcd8;color:#a3362c;font-weight:700;overflow:visible}.g-months span.now:before{content:'▼';position:absolute;top:-11px;left:50%;transform:translateX(-50%);font-size:9px;color:#bc534a}
+.g-line{display:flex;align-items:center;gap:7px;min-width:0}
+.g-code{flex:none;font-size:.62rem;font-weight:700;color:#3c551a;background:#eef3e5;border:1px solid #dde7cd;border-radius:4px;padding:0 5px;line-height:1.6}
+.g-title{all:unset;cursor:pointer;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;color:#242d25;font-size:.74rem}.g-title:hover{color:#587728;text-decoration:underline}
+.g-owner{font-size:.62rem;color:#7b8474;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.g-name.done .g-title{color:#7b8474}
+.g-date{font-weight:600;color:#242d25}.g-end small{font-size:.62rem}.g-end small.soon{color:#a3362c}.g-end small.mid{color:#8a6212}.g-end small.ok{color:#47631d}.g-end small.done{color:#7b8474}
+.g-time{position:relative;min-height:40px;background-image:linear-gradient(to right,#dfe5d6 1px,transparent 1px),linear-gradient(to right,#f0f3ec 1px,transparent 1px);background-size:calc(100% / var(--years)) 100%,calc(100% / var(--months)) 100%}
+.g-bar{all:unset;box-sizing:border-box;cursor:pointer;position:absolute;top:50%;transform:translateY(-50%);height:16px;border-radius:4px;background:#587728;color:#fff;font-size:.58rem;font-weight:700;padding:0 6px;display:flex;align-items:center;overflow:hidden;white-space:nowrap;min-width:3px;box-shadow:0 1px 2px #23311622}
+.g-bar:hover{background:#4d6a22}.g-bar.done{background:#adb89b}
+.g-today{position:absolute;top:0;bottom:0;width:0;border-left:2px solid #bc534a;z-index:1;pointer-events:none}
+.legend .today{width:2px!important;height:11px!important;background:#bc534a!important;border-radius:0!important}.legend-note{color:#8a9283}
+@media(max-width:1250px){.g-months span{font-size:0}.g-months span:after{content:attr(data-l);font-size:.55rem}}@media(max-width:700px){.g-name{padding:4px 8px}.g-end{padding:4px 6px}.g-title{font-size:.68rem}.g-months span:after{content:''}.g-bar>span{display:none}}
+#records details{scroll-margin-top:12px}
 </style>
 <a class="skip-link" href="#workspace">Saltar al contenido</a>
 <header><div class="masthead"><div class="brand"><img id="gpexLogo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGoAAAB2CAYAAAAgNQZ3AAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAABQxSURBVHja7F0JVBRX1n5sCiqKoIgbghkWUdCg4hLc0BgFl2hcAhLj7+TEDTVmjEY9J8aMmqBjiCNuGc2fMRHHSdAYcYtGRdzAZRTiBkERFAhGBRUbRey5X4diyqKqu7rppqu17zktvbyqeu997353e1UytVrNXpRXzr3zE+PTJ6p/e3gt2NL6boN/XiSZkRKgflRRysJaTWSve892qGtX/4kl9NuWvWAS4j6cPXlazn7KXc8WnOxV/svtQ7usQClQgpr0T+be331UyOLOjwv/8sI09Z2ym15K7vcLR32Pn5bZTj/iVwGt4ksdW0c2oPU7oMTmjet6FFqBUoAsTOuvvvHgkuTvHdz6sV7NIy+0d+3dxcm+YZkVKDMJqC71t+0627k6tmSfhPzspASwXjgbBXEjAOQI2S2WfvvnLKszYQFS8qiopRUoM4nqyX3ZbYn27lmBMpPcL78tu61HvZe+sAJlJrn7qEBWO7jsbRoGfWIFykxy48FlWe0IJID1VBFAEQ24Jud/W5pfmhn6IoBUpMoJRq5PVhbDbYBi+m1PEXqdvdfX1NukmpPSqI476+Yxgr3iMWZwqwbt9j6PQOXcS98kt22nJgN7KSozUfK4yOOLc+MKch9c+J/aOwexPi2jH/bwGOWsFPU3hnx7ZZ760M1/6mxHC5UtCvnZRin91tgo0qTCOcGJTj4uIVU/XL+fzjZdnlNv9rHgisTspWqA+TwAdaX4hKx2wU0HK6rftrx4oWxm0CanJk6ezzQoLS9mu6/HsznHuxZsuDgDObJBluvtFXqQLZbVtluzEZ0VCRQH1jjfxcliDZFtPlH4PRKae1Zn/Fl97d5/3rM0oDKLT5yS08674cuIn84qFqhKT6cvnwLF5OytPWzx6Yi4ZWffUBOVxFkKUJfuHm0lp11Pj1EVSuu7aBw1zOv9f8vlewLrvc/Ovm4RgF26e0z3hNjYsa7NhrlbBFABrr3HwuuTK1nFaRrAoGHZJWcUSYmwT7+rcmXETv2Zs4PbHYsAChLeJuaCIR7V0jND41ace1NxNiy75PQBeU7EyAtKXGiSQHVxH9JBl62Skot3jmhs2Mrz49Xk5k9UwkCzStLa62pDzhTr1HRgkEUBBYnyXTIanG2opN8+wD45NWjjqvQJagqmR5lzoKThOtt0cY9gSg3utQLl2aD9931aRNf4Iud+/4ktSnv1u68uzTLbbh85iVgKcpOV6gjpzJ6PaDvXub6Di1EudqxgK/bSXdv66yK16sk9x9oapJxELEoa/o1DwywWKALpAYH1yFgXfPy0TLP58YPjISr6+xTbt0w9yPzSzM91tSGQmJJzmrImqV/Ltx3JZTfqhUmjGGmWDWlYRepv2/NMOUiiW50lnKAm/R8xBYvs1Ty5/TpnfWIrPSYR27daIWg2lcNxqyxXp0fUrnFoz+cCKFDg3OBEB3LbTeM+U9D811ODvkMZwtj2q1hH6R11OKXl9gwGCoI7H6Z0+NJmYru4W/Te6J15qq5gqBXNPdFdhaqzsc77oLxY6++GxouKBYqTV5qPdV/c7bA3/TVJp1BaQS2MXHqjZDjKn2rf6OrTKKTiuQQK4urYMoc0y2ZRyM+DOzUZaJLOoeKMDAfiL1MWLon29j23QHGCvRXTg762WdI9pTN5h8wUlPhH/NW74EDeBoNuOrO3qaMLqL8oHSij3yQAR+BEYeKDlPwEO/4eDGMJPE/SZL023yDniHSWlKzpk6X4Ow9NejcHErJHC7ZuJOA0cZPRaMDGjg3ynMKGer9vJydI1XX3xsawfBula5RJswK0+r8a57vE5vPQc3bvtl99g2IVo3mH2MexMDWs4tLdoxt1tW9ct7lOFqitCf9dletf+DA7WFEaJSbYHLM3d+0erHBMuDEE3mekzyLJ+5jg6sOLlDp+Ycj+0UhAmxKcfXnrLx0r+Dfjco6w5WQbn2nXrJ4Xc7JrqHmPkot7Pa+HTR09k1DINduNbKi47s1dU5CSv4XJ3bmqTZwd3Nh4/2WngpsOrhYUYZsAKtBSx0b7ffoIaTJTjDMpZ6V6Z87nTHgrKi821QDmRba3RX3fCgc7x0e8MV1wc2y5jjzsH8x+xyFoZ8PFGSqUQoylXeN8Fz/jHFBc1mBGSoDkvTakTdAqo9op0BuN64xYHQza0r3ZCNa7ZbRsTVbEraEAa8W5SJWc4p4cwd7EdwNWz3qpUeeqW2bmneipLlLlSB4zwX9FSa8WkUap56AqsP1qrM1jQaCN3bcDWr1TEtJsWBN9vUzF3MNL9Gcfd35cOXJ+xvIMh3jNZMO9Z2s0RddWZntbBzY98OvdHdz6RRhbi3Av8Oves28ho6NI91xfQW1qbca7FdpiHn0FmynJ4+yMmwPWX5jcXhe4Q71msdc8J+kVVyFrsvNaXEFKQcIztggUN8xrlrpvq7fta1rrUuRd8dg6jV25xhIY7GHes1hi9qeyPE1UtPu3msg6N43QGlhfvHNka1rRjjGphdsZn+ZQLSZwAJLR7qhX7OMLtmR9pD6Qt8Hs/YC9g0fWmhwO5zpuD8kxqYcbKEDRpEnV2uPmgrF/WtiOjrtszH4o+jkTFNSqE7OXMksQOApRvou/8HPpMcviUkjGkIM3/v/J5swFdkrtH2gSe0pMFYdZDFAQ8tbKyGurq6Q+wfEIa/V/8OZq5ckuFvOIHSVpFirC4/2W9WpR3/dobV3Top6FhDsfkYw1l8DdfuOleSanOYsHCkKxkDrttx9r/brw5qJ8l5jtEXEWBxTSTR+l9Vdhm1ltCAEDgESTvRYFFFzoItU1bBC55d3w5ZG1wdt4vCieXGnq62BrAVGdIh4DZxSNQhlh7/W17yH1g3KDX+MejOKJigDX3iGm2i+HHUqmKPVDUHaY4L9iETkNHyuFSYxKfXgKzOmipPxzv/9Ul1a95jtsbvRr3J00rluFd8NOs0nrjPIQKGOnmThnASX+IV4zFVeaN5mNQg3o7K09N+jV6Jc7h6pybIg/CDBNsrRtw5dv0N/h7k5eemkdqsTL/vPGnlIdGyvlCnKB/SkmCm8T46SUR5OaxZmAA5BVkrY3u+RMH3qxrJLUZ7LMiO7dnbw1BTzk1ujzQ3q/gECt2hFz91Hh+JLHRV2zitPqnSlKYo+f1nw+cd0eHqOgQW5KvG9XEV4fbsomwOIAHF5iCU5TCKi4s3sE6+g2oEa1pxfWPcfNZkRp68jOtc+7f6EeHn54S5WLYpzBeypQbmhe37dqPwLR7Gx+1deSxCLiKBQUC0ozJ9wuuzkZQJZXlNXNL82sSidxdMl9blW/3QLnOm5H9LV9VqCsUmOp0QbMH3fsuLR6Vbz61q1brtapVLhGXbl8ud8Hsz846OPjwyKjImd16dr1ixdxIvPy8tqWFBd35D638fLa5ezs/Fhx1LclIeHu8thlLk2bNmVvRkWWjxo9uoExO6oUKSsrs009mfpNaurJqLSTqSwrK4vdvy/9eG7MR0D7ADY4PLxo4Guvebm4uKjMn5m4f7/O31eufLTp638yOzs7NmToEDYu+q3xHTt1/MaSwcG4DuzffylpZ1LbI8nJrKLCsK3Yjo6ObNjw4Wz8hLfDAwIC9pjdmbh69Wrgxx8tTD+akqL5TJ1iY94cW0Yrqo2Hh0eRpWhOcnLy/h8St4XRX3w26vnJRLDot6IvE3DtzO717dm9++SSvy7ulp+fX/UdQBvw6qusd98+k4KDg79UGkBEawsTv//uY9Ieg8FxdXNlHTt2YrQoNZ/9/P3KyOFyvHP7j+QH6PLq1WyGz23btmWTp069OWr0qFZmdc8flpY6xMfHP974jw2svLy82oD69OnLBg567WDPnj0Hm8umwRHYvm1bduJ33+O9Qecg54GNHTuW9QvrF+bn739IzjHFxcVOp0+dSkxNTR185fIVRmBJalitxVGgwxXL/5ZOWib6O2xaj549WWivUHW/sLAe5EWmmtLmHD9+fA9Rc9iRw8kGg8P1+8/vvMPee3+WHdmgGu2GLSwsdKfF3KB169ZXzR7wnj93/q1lsbGbThw/rnMC2hFN+vv7MT8//4o/+fhsJQqZpa+Nu56T40dUE/dr1q+DQTcXL1xkFy9eNMpYSHPY8r8tH9khMHC7qefNbJkJWs3rlsUum/RLRoZBx7do0YKo003zHrbAxaURu0z0wdNg0K5J+u7g4MBmzJzJpk2PqbW6ldlTSGS0z69auTIIBtYShEINtiIuLoicgIzavK5icn2HDh7c+uX69WPI61IkQObQIkUCxQlR4YgN/9iwbVdSksGBpSm06LPYWNne3AsBFCcUe7Ugl/7mjh0/MC7+qG1xcXFhH86fVzRm7Nhm5p4PiyhzJB9O3nzgwP4ouPa1AVq9+vU1MRG53HWVkq+0uHoUvMV9+/ZNIjcfmftqQXRNBHFceHh46bDXh7sqLaFs8YVDUOTV7OyPrudcj6b4qD68R6R+dIGITIKHRzNGMRALDg5ODe3Vq7eSs/0vRIUXaazbd+60Fov4LUWspXgLEet/mGwFyipWoKxAWcUKlFWsQFmBsopixN6Qg5DhzsjI+KqkpKTaY9NCQ0NrpeJZU8EYqP9hNI4YfA4MDIxv7en5d09PT0UWxmQHvDQoxy0JCap/JWxhubn/+78CaWCMBsjy6Dvue3z3ZlQki4yKcmrUqFGZ2CTFfha7jX+MHHklNFRz7g6BHYrp3I31HSxdy2f92nWZu3ftwnhE2yClFBkVKXn+vr16q6X6PHnKFDbnw7l616swt2+Ni1bxq90Y56Qpk6v6IQuodWvXqmmAVYOjg2nSXjkdHhHRVQyELQlbthGojEBCxzUXQ2fwuxA4TN74cdGZYoPHpOEckGNHn72HG9/TQDA5NnImgvqvonFUW2AYk9h2AFw7fs1qXzEN4xbtss9iqx33Y9JOvRllwbz5aswXhOYUc1b9ugBK6lVcXOw4bcpUtbdnG82rT2gv9dGUlFXajuFeGenpI4ZGDKk6Fi+pYxM2b77Lb4fX2jVr1MK+4Dthu+iocWr8pm0M/H6g/fXr1334bfCZP07u1SkwSI1xaBsj2vCPwbXkzI/Y2PFeqh2TO0C81zYhcs4hBRS+F06StskRtsUky7n+/A/naZ1E/C4GlrZxy1lkcoDWBhJekl4fnzNBM99s/lbU3mgTtK88Ti/Ohi2SEtAKUcMz38Hm0OuUCKVUjQHnXPLpUq00Sed1AiUKaI7FTJ0mubEftA7bxBeYCVC6LjqeP2/+NpwfpkSXzRUFirhXzedtGuBpfUHigwVbUmmPoo3hAcFJEX63e9fuLgLwTgFATuZ+OHekzL5Wu9Ue9pFeq6SOo2OeARiTT4skU9u1aI41iwi2UNcCEgUKHeIbXaxEMadBH4HB9/zDcBvlKciYUKHW8UGpnIgu/DHINfA01ubiDtW6GG39ocmOF4KLW5HE2uN7ztmCw2JQwCvsUHhEuFEe5gBvxphCcY9obMRpE9+L1GcMYouAm3htdEbHTBdSIC0WF87b5fcR3+M9gRQvN26zFZ5E6AZLrTD9gQofyUws5G7vEaNBmsSQmi6CygWglc4kKFAlZpdgZwGuQSkkGuA2oVE31DaJOQFyYh65kiGIfUAjXF/5NIjv9c02NGzUUCKb8YtObRRSIN/R4ewS5lXfubDXxvMU1Co5BSRKrUKjj9Xbto2XUfYbSGUzRCgwhm/nYS+JNjVBLTSOKM/J4KQs+FefdI45BcZYOGlErfGVmhZjqusKzYJcCsS8clkMAmmkISxVpVF5ubkzRLg6voYr0JFW/nJtq8+Qc3LGmJ9jkzoXaIZiuVrdL85RIMWiMYKwghmasLbncX6MCehpubCzXIdbe7bWChQoTPg7viPjHMPXJpzLkESoqUWMAmFaSNt8DMnQ29f2AGh1x8vRJFqVB7VlqkEtBFC1xLDQ4MuxK6YSoVPCBcKGaLi9jrJANLkT041ICbLpDhRxOOWIDbRIqO3aal7CdJWhN8oZgU1GIJWE/vAXC+wcqhEGe32V9ihGsAJcjNn5DhLxiS4K0ceWgVLl0KgpBXY0Zuq0bZUMMhK1N74jAgCJCfSiQFveJH6gb9xgKXLs6LEYY4Kgqw2CXFA2cqTQfPrry9d0OblASaDgqQhXvFx3VEki5qkifpEzwTLc81VkN7U+Ige0BqcBmQfOfkJzuMQ0f27FMv6yMhMUi1QzftqyxkoUUJzQTmEcqMgagc5itOUsMfGIl+CJCm0QPgtziKRVXeQuIAFQEb7VL747xtK0SmwyYRe4pK0hgpoUACfN8JVyHjDxYCXUtcTaSFCgSm+goKLCDDBoQ1cRTHlAhceLpX8qE6J6UyD2NICqMDdSeyhw7srMg69U5kGMAqWKnlqB4tIfQuogdc60NPoTK1XAVUflWu7CQ7thQ4ZW5egwN2LtuGSrnLKFoRRoK5b+wAWFqMNIWhJYQprhgzV8yNBMjEdqcvA9fkc7tK8s8Inm6NAOQNL1iuWGAIZQoK3UisSFBatGsmKpRMHKxlY1CSA043k5qKOKNEyNrQeYcLzwGd/jdy5QxXnEAmzMB+c86LPPUIoCtSmDZGYCF6YTroKnw3WYUHfJy81TV9KjzgwwHdfdnGBVTt5d9FuLyy0ZhlRqkmjKqxJc2XsexCiQHLVn9qYAdLrmXTHQbXVx/eGUI05YMTxVB3VgM6NajOtBGzCOMMAEchd+bi4yKvK0OcCiyT5tyE6oHUk7fYUgYWzIQWIeuN1ZhvZt6adLR4o4Li5itCx7SzNA+VfCFs12YGGilDOOwi3KGAhcZXhhujLl/Cy7KUoT3G7ZyuBXK0BYUMJkL2iOr5mVINV4nz1AEdtxK5wHg262Bmiksgn0t8sfAOVpBt8hsAM3iOLAwMCJSrxZAIDRwkjh+s6beDgDIUq9SeC/AgwALnC7rhZ7rq4AAAAASUVORK5CYII=" alt="GPEX"><span class="brand-divider" aria-hidden="true"></span><div><div class="brand-label">GESTIÓN PÚBLICA DE EXTREMADURA</div><div class="brand-caption">Área de Gestión Forestal y Medio Natural</div></div></div><div class="masthead-side"><div class="workspace-label">Registro del área</div><div id="connection" class="connection" role="status" data-state="loading">Conectando con Firebase</div></div></div></header>
@@ -354,7 +379,7 @@ function show(){
  if(!result.length) emptyState(query?'No hay coincidencias':mode==='jobs'?'El registro está listo para comenzar':'Sin adscripciones registradas',query?'Prueba con otro nombre, código o responsable.':mode==='jobs'?'Pulsa «Nuevo encargo» para añadir el primero.':data.jobs.length?'Pulsa «Añadir persona» para vincularla a un encargo.':'Crea primero un encargo para poder asignarle personal.');
  for(const item of result){
   if(mode==='jobs'){
-   const card=node('details',undefined,records);
+   const card=node('details',undefined,records); card.dataset.id=item.id;
    
    const summary=node('summary',undefined,card);
    const top=node('span',undefined,summary);top.className='summary-top';
@@ -423,62 +448,77 @@ function renderTimeline(list){
  dated.sort((a,b)=>(a.left<0)-(b.left<0)||(a.left<0?b.end-a.end:a.end-b.end));
  node('h2','Cronograma de encargos',box);
  if(dated.length){
-  // Vista: anualidad en curso y las dos siguientes; las anteriores quedan a la izquierda (desplazamiento)
+  // Diagrama de Gantt: la vista muestra la anualidad en curso y las dos siguientes;
+  // las anteriores quedan a la izquierda y se consultan desplazando.
   const cy=new Date(today).getUTCFullYear();
   const y0=Math.min(cy,...dated.map(d=>new Date(d.start).getUTCFullYear())), y1=cy+2;
-  const years=[];for(let y=y0;y<=y1;y++) years.push(y);
-  const first=y0*12, last=y1*12+11;
-  const wrap=node('div',undefined,box); wrap.className='crono-wrap';
+  const nY=y1-y0+1, nM=nY*12, m0=y0*12;
+  // posición (0-100 %) de una fecha dentro del periodo; todos los meses miden lo mismo
+  const pos=t=>{const d=new Date(t), y=d.getUTCFullYear(), m=d.getUTCMonth(), dim=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+   return Math.max(0,Math.min(100,((y*12+m-m0)+(d.getUTCDate()-1)/dim)/nM*100));};
+  const wrap=node('div',undefined,box); wrap.className='gantt-wrap';
   wrap.addEventListener('scroll',()=>{cronoScroll=wrap.scrollLeft;});
-  const table=node('table',undefined,wrap); table.className='crono';
-  const cg=node('colgroup',undefined,table);
-  node('col',undefined,cg).className='k-name'; node('col',undefined,cg).className='k-end';
-  for(const y of years){ for(let m=0;m<12;m++) node('col',undefined,cg).className='k-m'; node('col',undefined,cg).className='k-sep'; }
-  const head=node('thead',undefined,table);
-  const tr1=node('tr',undefined,head); tr1.className='c-years';
-  node('th','Encargo',tr1).className='c-name'; node('th','Fin',tr1).className='c-end';
-  for(const y of years){ const t=node('th',String(y),tr1); t.colSpan=12; if(y===cy) t.className='c-cur'; node('th','',tr1).className='c-sep'; }
-  const tr2=node('tr',undefined,head); tr2.className='c-months';
-  node('th','',tr2).className='c-name'; node('th','',tr2).className='c-end';
-  for(const y of years){ for(let m=0;m<12;m++){ const t=node('th',undefined,tr2); node('span',MESES[m],t).className='m3'; node('span',MESES[m][0],t).className='m1'; if(y*12+m===todayM) t.className='c-now c-now-h'; } node('th','',tr2).className='c-sep'; }
-  const tb=node('tbody',undefined,table);
+  const g=node('div',undefined,wrap); g.className='gantt'; g.style.setProperty('--months',nM); g.style.setProperty('--years',nY);
+  // Cabecera
+  const h1=node('div','Encargo',g); h1.className='g-cell g-name g-head';
+  const h2=node('div','Finalización',g); h2.className='g-cell g-end g-head';
+  const ht=node('div',undefined,g); ht.className='g-cell g-time g-head';
+  const yr=node('div',undefined,ht); yr.className='g-years';
+  for(let y=y0;y<=y1;y++){ const c=node('span',String(y),yr); if(y===cy) c.className='cur'; }
+  const mr=node('div',undefined,ht); mr.className='g-months';
+  for(let i=0;i<nM;i++){ const c=node('span',MESES[i%12],mr); c.dataset.l=MESES[i%12][0]; if(m0+i===todayM) c.className='now'; }
+  const todayPos=pos(today);
+  // Filas
   for(const d of dated){
-   const tr=node('tr',undefined,tb); if(d.left<0) tr.className='c-done';
-   const name=node('td',jobLabel(d.j),tr); name.className='c-name'; name.title=jobLabel(d.j)+'\n'+fmtDate(d.start)+' – '+fmtDate(d.end);
-   const end=node('td',undefined,tr); end.className='c-end';
-   node('span',fmtDate(d.end),end);
-   const tag=node('small',d.left<0?'finalizado':d.left===0?'hoy':d.left+(d.left===1?' día':' días'),end);
-   tag.className=d.left<0?'done':d.left<=90?'soon':d.left<=180?'mid':'ok';
-   const a=monthIndex(d.start), b=monthIndex(d.end);
-   for(const y of years){
-    for(let m=0;m<12;m++){
-     const i=y*12+m, c=node('td','',tr); c.className=(i>=a&&i<=b?'on':'')+(i===todayM?' c-now':'');
-     if(i>=a&&i<=b) c.title=jobLabel(d.j)+': '+MESES[m]+' '+y;
-     if(i===first&&a<first&&b>=first) c.textContent='◄';
-     if(i===last&&b>last&&a<=last) c.textContent='►';
-    }
-    node('td','',tr).className='c-sep';
+   const open=()=>openJobCard(d.j.id);
+   const nm=node('div',undefined,g); nm.className='g-cell g-name'+(d.left<0?' done':'');
+   nm.title=jobLabel(d.j)+'\n'+fmtDate(d.start)+' – '+fmtDate(d.end);
+   const l1=node('div',undefined,nm); l1.className='g-line';
+   node('span',d.j.code||'—',l1).className='g-code';
+   const t=node('button',d.j.name||'Encargo sin nombre',l1); t.type='button'; t.className='g-title'; t.onclick=open;
+   const ow=jobOwners(d.j); node('div',ow.join(', ')||'Sin responsable asignado',nm).className='g-owner';
+   const en=node('div',undefined,g); en.className='g-cell g-end';
+   node('span',fmtDate(d.end),en).className='g-date';
+   node('small',d.left<0?'finalizado':d.left===0?'hoy':d.left+(d.left===1?' día':' días'),en).className=d.left<0?'done':d.left<=90?'soon':d.left<=180?'mid':'ok';
+   const tl=node('div',undefined,g); tl.className='g-cell g-time';
+   const a=pos(d.start), b=pos(d.end+DAY);
+   if(b>a){
+    const bar=node('button',undefined,tl); bar.type='button'; bar.className='g-bar'+(d.left<0?' done':'');
+    bar.style.left=a+'%'; bar.style.width=(b-a)+'%';
+    bar.title=jobLabel(d.j)+': '+fmtDate(d.start)+' – '+fmtDate(d.end); bar.onclick=open;
+    const lab=node('span',d.j.code||'',bar);
+    const vs=(cy*12-m0)/nM*100; // inicio de la vista (enero del año en curso)
+    if(a<vs&&b>vs) lab.style.marginLeft='calc('+((vs-a)/(b-a)*100)+'% - 2px)';
    }
+   const tline=node('span','',tl); tline.className='g-today'; tline.style.left=todayPos+'%';
   }
+  const lg=node('div',undefined,box); lg.className='legend';
+  for(const [label,cls] of [['Periodo del encargo',''],['Encargo finalizado','ended'],['Día actual','today']]){const part=node('span',undefined,lg);node('i',undefined,part).className=cls;node('span',label,part);}
+  node('span','Pulsa el nombre o la barra para abrir el encargo.',lg).className='legend-note';
+  sizeCrono(true);
  }
- if(dated.length) sizeCrono(true);
- if(dated.length){const legend=node('div',undefined,box);legend.className='legend';for(const [label,cls] of [['Periodo del encargo',''],['Encargo finalizado','ended'],['Mes actual','current']]){const part=node('span',undefined,legend);node('i',undefined,part).className=cls;node('span',label,part);}}
  if(undated.length) node('p','Sin fecha de fin (no aparecen en el cronograma): '+undated.map(jobLabel).join('; '),box).className='muted';
 }
-// Ajusta el ancho: tres anualidades ocupan exactamente el ancho visible (meses iguales);
+// Abre (y lleva hasta) la ficha de un encargo en el listado
+function openJobCard(id){
+ if(mode!=='jobs') switchMode('jobs');
+ if(byId('search').value){ byId('search').value=''; show(); }
+ const card=byId('records').querySelector('details[data-id="'+CSS.escape(id)+'"]');
+ if(card){ card.open=true; card.scrollIntoView({behavior:'smooth',block:'start'}); }
+}
+// Ajusta el ancho: tres anualidades ocupan exactamente el ancho visible;
 // las anteriores quedan fuera por la izquierda y se ven con la barra de desplazamiento.
 let cronoScroll=null;
 function sizeCrono(keepScroll){
- const wrap=document.querySelector('#timeline .crono-wrap'), table=wrap&&wrap.querySelector('.crono');
- if(!table) return;
- const cols=table.querySelectorAll('col'), nYears=table.querySelectorAll('.c-years th[colspan]').length;
- const cy=new Date().getFullYear(), y0=cy-(nYears-3);
- const W=wrap.clientWidth, cs=getComputedStyle(table), pct=v=>(parseFloat(cs.getPropertyValue(v))||0)/100;
- const ew=Math.round(W*pct('--e')), sw=Math.max(4,Math.round(W*pct('--s'))), mw=Math.floor((W-W*pct('--n')-ew-3*sw)/36), nw=W-ew-3*sw-36*mw;
- cols.forEach(c=>{c.style.width=(c.classList.contains('k-name')?nw:c.classList.contains('k-end')?ew:c.classList.contains('k-sep')?sw:mw)+'px';});
- table.style.width=(nw+ew+nYears*(12*mw+sw))+'px'; table.style.minWidth='0';
- table.style.setProperty('--nwpx',nw+'px');
- wrap.scrollLeft=keepScroll&&cronoScroll!==null?cronoScroll:(cy-y0)*(12*mw+sw);
+ const wrap=document.querySelector('#timeline .gantt-wrap'), g=wrap&&wrap.querySelector('.gantt');
+ if(!g) return;
+ const nY=+g.style.getPropertyValue('--years'), W=wrap.clientWidth, narrow=W<700;
+ const lw=Math.round(narrow?Math.max(130,W*.36):Math.max(240,W*.26)), ew=narrow?78:110;
+ const tv=W-lw-ew, tw=Math.round(tv*nY/3);
+ g.style.gridTemplateColumns=lw+'px '+ew+'px '+tw+'px'; g.style.width=(lw+ew+tw)+'px';
+ g.style.setProperty('--lw',lw+'px'); g.style.setProperty('--ew',ew+'px');
+ const cy=new Date().getFullYear(), y0=cy-(nY-3);
+ wrap.scrollLeft=keepScroll&&cronoScroll!==null?cronoScroll:(cy-y0)*tw/nY;
 }
 addEventListener('resize',()=>{cronoScroll=null;sizeCrono(false);});
 function switchMode(next,query=''){
