@@ -125,14 +125,15 @@ details>.actions{padding:8px 18px}.actions button{min-height:32px;padding:5px 11
 @media(max-width:560px){details>dl{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px 14px;gap:6px 14px}.job-actions .table-wrap{overflow-x:auto}.job-actions table{min-width:980px}summary{padding:12px 34px 12px 14px}.job-actions{padding:8px 10px}}
 .xls-help{margin:10px 24px 0;border:1px solid var(--line,#e2e7dd);border-radius:7px;background:#fafbf8;font-size:.8rem}.xls-help>summary{padding:8px 34px 8px 12px;font-size:.78rem;color:var(--brand-dark,#3c551a);font-weight:600;background:transparent}.xls-help>summary:after{top:14px;right:14px}.xls-help[open]>summary:after{top:18px}.xls-help-body{padding:4px 14px 10px;color:#4b5545}.xls-help-body ol{margin:.3rem 0 .5rem;padding-left:1.2rem}.xls-help-body p{margin:.35rem 0}#error{white-space:pre-line}.import-note{white-space:pre-line;margin:0 0 16px;padding:10px 14px;border:1px solid #cfdcb9;border-left:4px solid var(--brand,#567528);border-radius:6px;background:#f4f8ec;color:#3c551a;font-size:.8rem;line-height:1.5}@media(max-width:560px){.xls-help{margin:10px 16px 0}}
 
-/* Encargo desplegado: cabecera en verde oscuro y listado de acciones claro */
-#records details[open]{border-color:#2f4515}
-details[open]>summary{background:#2f4515;border-bottom:0;color:#fff}
-details[open]>summary .job-title{color:#fff}
-details[open]>summary .summary-meta{color:#c9d8b3}details[open]>summary .summary-meta b{color:#fff}
-details[open]>summary .code-badge{background:#fff;border-color:#fff;color:#2f4515}
-details[open]>summary .state-badge{background:#4a6a24;color:#eef6e2}
-details[open]>summary:after{border-color:#fff}
+/* Cabecera de encargo en verde oscuro (plegado y desplegado); listado de acciones claro */
+#records details,#records details[open]{border-color:#2f4515}
+#records details>summary,#records details[open]>summary{background:#2f4515;border-bottom:0;color:#fff}
+#records details>summary:hover{background:#38521a}
+#records details>summary .job-title{color:#fff}
+#records details>summary .summary-meta{color:#c9d8b3}#records details>summary .summary-meta b{color:#fff}
+#records details>summary .code-badge{background:#fff;border-color:#fff;color:#2f4515}
+#records details>summary .state-badge{background:#4a6a24;color:#eef6e2}
+#records details>summary:after{border-color:#fff}
 details[open]>dl{background:#f3f6ee;border-bottom:1px solid #dfe7d3}
 .job-actions{background:#fff}
 .job-actions .table-wrap{border-color:#e8ede1}
