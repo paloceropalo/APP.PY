@@ -44,7 +44,7 @@ const schema = [
 const key = 'gpex-gestion-forestal-v1';
 const euro = new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'});
 let mode = 'jobs', editing, initialJob;
-let data = {jobs:[],staff:[]}, ready = false, db;
+let data = {jobs:[],staff:[]}, ready = false, db, dbError = '';
 const loaded = {jobs:false,staff:false};
 function startFirebase(){
  if (Object.values(firebaseConfig).some(v=>!v || v==='PEGA_AQUI')) {
@@ -55,6 +55,7 @@ function startFirebase(){
   firebase.initializeApp(firebaseConfig);
   db = firebase.firestore();
   // Sin inicio de sesión: cualquiera con el enlace ve y edita los datos en tiempo real.
+  setTimeout(()=>{ if(!ready && !dbError) fail({message:'sin respuesta tras 15 segundos; comprueba la conexión a internet'}); },15000);
   for (const m of ['jobs','staff']) {
    db.collection(collections[m]).onSnapshot(snap=>{
     data[m] = snap.docs.map(d=>({...d.data(),id:d.id}));
@@ -67,8 +68,11 @@ function startFirebase(){
 }
 function fail(err){
  console.error(err);
- byId('status').textContent = 'No se puede leer la base de datos ('+(err.code||err.message)+'). Revisa que las reglas de Firestore permitan lectura/escritura en gf_encargos y gf_adscripciones.';
- byId('add').disabled = true;
+ dbError = err.code==='permission-denied'
+  ? 'Firebase no da permiso para leer los datos (permission-denied). Hay que añadir las reglas de gf_encargos y gf_adscripciones en Firestore → Reglas y pulsar Publicar.'
+  : 'No se puede conectar con la base de datos ('+(err.code||err.message)+').';
+ byId('status').textContent = dbError;
+ byId('status').style.color = '#a31c27';
 }
 function node(tag,value,parent){
  const el=document.createElement(tag);
@@ -124,13 +128,13 @@ function show(){
  byId('jobs').setAttribute('aria-pressed',mode==='jobs');
  byId('staff').setAttribute('aria-pressed',mode==='staff');
  byId('add').textContent=mode==='jobs'?'Nuevo encargo':'Añadir persona';
- byId('add').disabled=!ready||(mode==='staff'&&!data.jobs.length);
+ byId('add').disabled=ready&&mode==='staff'&&!data.jobs.length;
  byId('search').placeholder=mode==='jobs'?'Buscar por nombre, código o expediente':'Buscar por persona o encargo';
  const records=byId('records');
  records.replaceChildren();
  const query=normalize(byId('search').value.trim());
  const jobs=new Map(data.jobs.map(job=>[job.id,job]));
- if(!ready){if(db) byId('status').textContent='Conectando con Firebase…';return;}
+ if(!ready){if(db) byId('status').textContent=dbError||'Conectando con Firebase…';return;}
  const result=data[mode].filter(item=>{
   const text=mode==='jobs'?[item.name,item.code,item.exp,item.action]:[item.name,jobLabel(jobs.get(item.job)||{}),item.role];
   return normalize(text.join(' ')).includes(query);
@@ -220,7 +224,10 @@ byId('form').onsubmit=async event=>{
 byId('jobs').onclick=()=>switchMode('jobs');
 byId('staff').onclick=()=>switchMode('staff');
 byId('search').oninput=show;
-byId('add').onclick=()=>openEditor();
+byId('add').onclick=()=>{
+ if(!ready){ alert(dbError||'Todavía conectando con la base de datos. Espera unos segundos.'); return; }
+ openEditor();
+};
 byId('cancel').onclick=()=>byId('editor').close();
 byId('addYear').onclick=()=>addMoney();
 byId('import').onclick=importLocal;
