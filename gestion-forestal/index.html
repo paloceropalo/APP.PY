@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Gestión Forestal y Medio Natural</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f1f4ef;color:#20352a;font:16px system-ui,sans-serif}header{background:#153b2d;color:white;padding:3rem max(5vw,1rem) 2rem}header p{color:#bad7c5;margin:0}h1{margin:.4rem 0;font-size:clamp(1.7rem,5vw,3rem)}main{max-width:1120px;margin:auto;padding:1.5rem 1rem}nav,.bar,.actions{display:flex;gap:.65rem;flex-wrap:wrap;align-items:center}nav{border-bottom:1px solid #cbd7ce;padding-bottom:.75rem}.bar{margin:1rem 0}.bar input{flex:1;min-width:12rem}input,select,textarea,button{font:inherit;border:1px solid #aebfb4;border-radius:8px;padding:.65rem;background:white;color:inherit}button,summary{cursor:pointer}button.primary,button[aria-pressed=true]{background:#215b42;color:white;border-color:#215b42}details,.card{background:white;border:1px solid #d3ded5;border-radius:12px;margin:.65rem 0;padding:1rem}summary{font-weight:700}small,dt,.muted{color:#52675b}dl,.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:1rem}dt{font-size:.85rem}dd{margin:.25rem 0 0;white-space:pre-wrap;overflow-wrap:anywhere}label{display:grid;gap:.3rem;font-weight:600}label>*{width:100%;min-width:0;font-weight:400}dialog{width:min(860px,94vw);border:1px solid #cad9cf;border-radius:14px;color:inherit}dialog::backdrop{background:#12281cb0}fieldset{border:1px solid #cad9cf;border-radius:8px;margin:1rem 0}.money{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem}.money input{width:9rem;max-width:100%}.actions{margin-top:1rem}#error{color:#a31c27}
+</style>
+<header><p>GPEX · Registro del área</p><h1>Gestión Forestal y Medio Natural</h1><p>Encargos y personal adscrito</p></header>
+<main>
+<nav aria-label="Secciones"><button id="jobs" aria-pressed="true">Encargos</button><button id="staff" aria-pressed="false">Personal adscrito</button></nav>
+<div class="bar"><input id="search" type="search" aria-label="Buscar registros" placeholder="Buscar encargos"><button class="primary" id="add">Nuevo encargo</button><button id="import" hidden></button></div>
+<p id="status" class="muted" role="status"></p><section id="records" aria-label="Resultados"></section>
+<p class="muted">Datos guardados en Firebase y sincronizados en tiempo real.</p>
+</main>
+<dialog id="editor" aria-labelledby="title"><form id="form">
+<h2 id="title"></h2><div id="fields" class="fields"></div>
+<fieldset id="budget"><legend>Importe por anualidad (€)</legend><div id="years"></div><button type="button" id="addYear">Añadir anualidad</button></fieldset>
+<p id="error" role="alert"></p><div class="actions"><button class="primary">Guardar</button><button type="button" id="cancel">Cancelar</button></div>
+</form></dialog>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+'use strict';
+/* ===== CONFIGURACIÓN DE FIREBASE =====
+   Copia aquí el mismo objeto firebaseConfig que usa gestor-vehiculos.html
+   (proyecto cuadrante-secona). */
+const firebaseConfig = {
+ apiKey: 'PEGA_AQUI',
+ authDomain: 'PEGA_AQUI',
+ projectId: 'PEGA_AQUI',
+ storageBucket: 'PEGA_AQUI',
+ messagingSenderId: 'PEGA_AQUI',
+ appId: 'PEGA_AQUI'
+};
+const collections = {jobs:'gf_encargos', staff:'gf_adscripciones'};
+const byId = id => document.getElementById(id);
+const schema = [
+ ['exp','Nº expediente'],['name','Nombre'],['code','Código encargo'],['action','Código acción'],
+ ['service','Órgano gestor (servicio)'],['chief','Jefe de servicio'],['department','Consejería y director general'],
+ ['director','Director de los trabajos del encargo'],['start','Fecha de inicio','date'],['end','Fecha de fin','date'],
+ ['fund','Fondo'],['notes','Incidencias','textarea']
+];
+const key = 'gpex-gestion-forestal-v1';
+const euro = new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'});
+let mode = 'jobs', editing, initialJob;
+let data = {jobs:[],staff:[]}, ready = false, db;
+const loaded = {jobs:false,staff:false};
+function startFirebase(){
+ if (Object.values(firebaseConfig).some(v=>!v || v==='PEGA_AQUI')) {
+  byId('status').textContent='Falta la configuración de Firebase: rellena firebaseConfig en este archivo.';
+  return;
+ }
+ try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+  // Sin inicio de sesión: cualquiera con el enlace ve y edita los datos en tiempo real.
+  for (const m of ['jobs','staff']) {
+   db.collection(collections[m]).onSnapshot(snap=>{
+    data[m] = snap.docs.map(d=>({...d.data(),id:d.id}));
+    loaded[m] = true;
+    ready = loaded.jobs && loaded.staff;
+    show(); offerImport();
+   }, err=>fail(err));
+  }
+ } catch(err) { fail(err); }
+}
+function fail(err){
+ console.error(err);
+ byId('status').textContent = 'No se pudo conectar con Firebase: '+(err.code||err.message);
+ byId('add').disabled = true;
+}
+function node(tag,value,parent){
+ const el=document.createElement(tag);
+ if(value !== undefined) el.textContent=value;
+ parent?.append(el);
+ return el;
+}
+function button(label,parent,fn){
+ const el=node('button',label,parent);
+ el.type='button'; el.addEventListener('click',fn);
+ return el;
+}
+async function saveRecord(m,record){
+ try { await db.collection(collections[m]).doc(record.id).set(record); return true; }
+ catch(err){ console.error(err); return false; }
+}
+async function deleteRecord(m,id){
+ try { await db.collection(collections[m]).doc(id).delete(); return true; }
+ catch(err){ console.error(err); return false; }
+}
+function localData(){
+ try {
+  const d = JSON.parse(localStorage.getItem(key));
+  if (d && Array.isArray(d.jobs) && Array.isArray(d.staff) && (d.jobs.length||d.staff.length)) return d;
+ } catch {}
+ return null;
+}
+function offerImport(){
+ const old = localData(), box = byId('import');
+ const show_ = ready && old && !data.jobs.length && !data.staff.length && !localStorage.getItem(key+'-importado');
+ box.hidden = !show_;
+ if (show_) box.textContent = 'Importar datos de este navegador ('+old.jobs.length+' encargos, '+old.staff.length+' adscripciones)';
+}
+async function importLocal(){
+ const old = localData(); if(!old) return;
+ try {
+  const batch = db.batch();
+  for (const m of ['jobs','staff'])
+   for (const r of old[m]) batch.set(db.collection(collections[m]).doc(r.id),r);
+  await batch.commit();
+  localStorage.setItem(key+'-importado','1');
+ } catch(err){ alert('No se pudo importar: '+(err.code||err.message)); }
+}
+function definition(list,label,value){
+ const group=node('div',undefined,list);
+ node('dt',label,group); node('dd',value || '—',group);
+}
+function normalize(value){
+ return value.normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase();
+}
+function jobLabel(job){return [job.code,job.name].filter(Boolean).join(' · ');}
+function show(){
+ byId('jobs').setAttribute('aria-pressed',mode==='jobs');
+ byId('staff').setAttribute('aria-pressed',mode==='staff');
+ byId('add').textContent=mode==='jobs'?'Nuevo encargo':'Añadir persona';
+ byId('add').disabled=!ready||(mode==='staff'&&!data.jobs.length);
+ byId('search').placeholder=mode==='jobs'?'Buscar por nombre, código o expediente':'Buscar por persona o encargo';
+ const records=byId('records');
+ records.replaceChildren();
+ const query=normalize(byId('search').value.trim());
+ const jobs=new Map(data.jobs.map(job=>[job.id,job]));
+ if(!ready){if(db) byId('status').textContent='Conectando con Firebase…';return;}
+ const result=data[mode].filter(item=>{
+  const text=mode==='jobs'?[item.name,item.code,item.exp,item.action]:[item.name,jobLabel(jobs.get(item.job)||{}),item.role];
+  return normalize(text.join(' ')).includes(query);
+ }).sort((a,b)=>(a.name||'').localeCompare(b.name||'','es'));
+ byId('status').textContent=result.length ? result.length+' '+(mode==='jobs'?(result.length===1?'encargo':'encargos'):(result.length===1?'adscripción':'adscripciones')) : (query?'Sin resultados':mode==='jobs'?'Todavía no hay encargos.':data.jobs.length?'Todavía no hay personal adscrito.':'Da de alta un encargo para asignarle personal.');
+ for(const item of result){
+  if(mode==='jobs'){
+   const card=node('details',undefined,records);
+   node('summary',jobLabel(item),card);
+   const list=node('dl',undefined,card);
+   for(const [id,label,type] of schema){
+    const value=item[id];
+    definition(list,label,type==='date'&&value?value.split('-').reverse().join('/'):value);
+    if(id==='action') definition(list,'Importe por anualidad',(item.years||[]).map(row=>row.year+' · '+euro.format(row.amount)).join('\n'));
+   }
+   const actions=node('div',undefined,card); actions.className='actions';
+   button('Editar encargo',actions,()=>openEditor(item));
+   button('Ver personal',actions,()=>switchMode('staff',jobLabel(item)));
+   button('Asignar persona',actions,()=>{switchMode('staff');openEditor(null,item.id);});
+  } else {
+   const card=node('article',undefined,records);card.className='card';
+   node('strong',item.name,card);
+   node('p',[jobLabel(jobs.get(item.job)||{}),item.role].filter(Boolean).join(' · '),card);
+   button('Editar adscripción',card,()=>openEditor(item));
+   button('Retirar adscripción',card,async()=>{
+    if(!confirm('¿Retirar esta adscripción de '+item.name+'?')) return;
+    if(!await deleteRecord('staff',item.id)) alert('No se pudieron guardar los cambios.');
+   });
+  }
+ }
+}
+function switchMode(next,query=''){
+ mode=next;byId('search').value=query;show();
+}
+function addMoney(row={}){
+ const line=node('div',undefined,byId('years'));line.className='money';
+ for(const [name,label,min,max,step] of [['year','Año',1900,9999,1],['amount','Importe (€)',0,null,0.01]]){
+  const input=node('input',undefined,line);input.name=name;input.type='number';
+  input.placeholder=label;input.setAttribute('aria-label',label);
+  input.required=true;input.min=min;input.step=step;if(max) input.max=max;
+  input.value=row[name]??'';
+ }
+ button('Quitar',line,()=>line.remove());
+}
+function openEditor(item,job){
+ editing=item; initialJob=job;
+ byId('error').textContent='';
+ byId('title').textContent=mode==='jobs'?(item?'Editar encargo':'Nuevo encargo'):(item?'Editar adscripción':'Añadir persona');
+ const fields=byId('fields');fields.replaceChildren();
+ const definitions=mode==='jobs'?schema:[['name','Nombre y apellidos'],['job','Encargo','select'],['role','Puesto o función']];
+ for(const [id,label,type] of definitions){
+  const wrap=node('label',label,fields);
+  const input=node(type==='textarea'||type==='select'?type:'input',undefined,wrap);
+  input.name=id;
+  if(input.tagName==='INPUT') input.type=type||'text';
+  if(type==='select'){
+   for(const job of data.jobs){
+    const option=node('option',jobLabel(job),input);option.value=job.id;
+   }
+  }
+  input.required=id==='name'||id==='job';
+  input.value=item?.[id]??(id==='job'?initialJob||data.jobs[0]?.id||'':'');
+ }
+ byId('budget').hidden=mode!=='jobs';byId('years').replaceChildren();
+ for(const row of item?.years||[]) addMoney(row);
+ byId('editor').showModal();
+}
+byId('form').onsubmit=async event=>{
+ event.preventDefault();
+ const values=Object.fromEntries(Array.from(byId('fields').querySelectorAll('input,select,textarea'),el=>[el.name,el.value.trim()]));
+ const error=message=>{byId('error').textContent=message;};
+ if(!values.name) return error('Introduce un nombre.');
+ if(mode==='jobs'){
+  if(values.start&&values.end&&values.end<values.start) return error('La fecha de fin debe ser igual o posterior a la de inicio.');
+  values.years=Array.from(byId('years').children,line=>({
+   year:Number(line.querySelector('[name=year]').value),amount:Number(line.querySelector('[name=amount]').value)
+  })).sort((a,b)=>a.year-b.year);
+  if(new Set(values.years.map(row=>row.year)).size!==values.years.length) return error('Introduce un único importe por año.');
+ }
+ const record={...values,id:editing?.id||globalThis.crypto.randomUUID()};
+ const btn=byId('form').querySelector('button.primary');btn.disabled=true;
+ const ok=await saveRecord(mode,record);
+ btn.disabled=false;
+ if(!ok) return error('No se pudieron guardar los cambios.');
+ byId('editor').close();byId('search').value='';show();
+};
+byId('jobs').onclick=()=>switchMode('jobs');
+byId('staff').onclick=()=>switchMode('staff');
+byId('search').oninput=show;
+byId('add').onclick=()=>openEditor();
+byId('cancel').onclick=()=>byId('editor').close();
+byId('addYear').onclick=()=>addMoney();
+byId('import').onclick=importLocal;
+show();
+startFirebase();
+</script>
+</html>
