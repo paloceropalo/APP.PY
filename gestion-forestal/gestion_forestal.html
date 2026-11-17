@@ -23,16 +23,15 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 'use strict';
-/* ===== CONFIGURACIÓN DE FIREBASE =====
-   Copia aquí el mismo objeto firebaseConfig que usa gestor-vehiculos.html
-   (proyecto cuadrante-secona). */
+/* ===== CONFIGURACIÓN DE FIREBASE (proyecto cuadrante-secona, igual que gestor-vehiculos.html) ===== */
 const firebaseConfig = {
- apiKey: 'PEGA_AQUI',
- authDomain: 'PEGA_AQUI',
- projectId: 'PEGA_AQUI',
- storageBucket: 'PEGA_AQUI',
- messagingSenderId: 'PEGA_AQUI',
- appId: 'PEGA_AQUI'
+ apiKey: "AIzaSyC4GTuNF806rml_rfzwvzkr_rqucfzijxo",
+ authDomain: "cuadrante-secona.firebaseapp.com",
+ databaseURL: "https://cuadrante-secona-default-rtdb.europe-west1.firebasedatabase.app",
+ projectId: "cuadrante-secona",
+ storageBucket: "cuadrante-secona.firebasestorage.app",
+ messagingSenderId: "175128885677",
+ appId: "1:175128885677:web:be910a122535a9bd4cc924"
 };
 const collections = {jobs:'gf_encargos', staff:'gf_adscripciones'};
 const byId = id => document.getElementById(id);
@@ -68,7 +67,7 @@ function startFirebase(){
 }
 function fail(err){
  console.error(err);
- byId('status').textContent = 'No se pudo conectar con Firebase: '+(err.code||err.message);
+ byId('status').textContent = 'No se puede leer la base de datos ('+(err.code||err.message)+'). Revisa que las reglas de Firestore permitan lectura/escritura en gf_encargos y gf_adscripciones.';
  byId('add').disabled = true;
 }
 function node(tag,value,parent){
