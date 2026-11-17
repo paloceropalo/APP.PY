@@ -54,8 +54,10 @@ function jobActions(job){
    for(const y of a.years) out.push({code:a.code||'',name:a.name||'',year:y.year??'',amount:y.amount??null});
   } else out.push({code:a.code||'',name:a.name||'',year:a.year??'',amount:a.amount??null});
  }
- return out;
+ return out.sort(byAction);
 }
+// Orden de las acciones: por código (agrupa cada acción con sus anualidades) y después por año
+const byAction=(a,b)=>String(a.code||'').localeCompare(String(b.code||''),'es',{numeric:true})||(a.year||0)-(b.year||0);
 // Formato contable en euros: 1.234.567,89 €
 function money(n){
  if(n===null||n===undefined||n===''||isNaN(n)) return '';
@@ -331,7 +333,7 @@ byId('form').onsubmit=async event=>{
    if(y&&!/^\d{4}$/.test(y)) return error('La anualidad de la acción '+label+' debe ser un año (por ejemplo 2026).');
    values.actions.push({code,name,year:y?Number(y):null,amount});
   }
-  values.actions.sort((a,b)=>(a.year||0)-(b.year||0)||a.code.localeCompare(b.code,'es'));
+  values.actions.sort(byAction);
  }
  const record={...values,id:editing?.id||globalThis.crypto.randomUUID()};
  const btn=byId('form').querySelector('button.primary');btn.disabled=true;
