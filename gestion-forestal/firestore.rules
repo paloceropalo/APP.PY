@@ -15,7 +15,7 @@ service cloud.firestore {
       allow create, update: if request.resource.data.id == id
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
-        && request.resource.data.name.size() < 500;
+        && request.resource.data.name.size() <= 1000;
     }
 
     // Personal adscrito
