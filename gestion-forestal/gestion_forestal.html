@@ -599,7 +599,8 @@ const STAFF_TABLE=[['puesto','Puesto G.E.'],['emp','Código'],['name','Nombre'],
  ['hours','Horas'],['contract','Contrato'],['coord','Coordinación'],['obs','Obs.'],['email','Correo'],['mobile','Móvil']];
 let staffJob='', staffAction='';
 const groupOf=code=>{const m=String(code||'').match(/^(\d{2})[.,](\d{2})/);return m?m[1]+'.'+m[2]:'';};
-function staffGroup(p){ return p.actionGroup||groupOf(String(p.actionText||'').trim())||(String(p.jobKey||'').match(/_(\d{2})(\d{2})$/)||[]).slice(1,3).join('.'); }
+function puestoParts(puesto){ const m=String(puesto||'').trim().match(/^([A-Za-z]\d{4,6})_(\d{2})(\d{2})(?:_|$)/); return m?{code:m[1].toUpperCase(),group:m[2]+'.'+m[3]}:null; }
+function staffGroup(p){ return (puestoParts(p.puesto)||{}).group||p.actionGroup||groupOf(String(p.actionText||'').trim())||(String(p.jobKey||'').match(/_(\d{2})(\d{2})$/)||[]).slice(1,3).join('.'); }
 // Grupos de acción de un encargo (de sus acciones y de su personal), con nombre
 function actionGroups(job){
  const map=new Map();
@@ -813,39 +814,102 @@ byId('xlsFile').onchange=async()=>{
  }catch(err){ console.error(err); alert('No se pudo importar el Excel: '+err.message); }
 };
 // ===== Importación del Excel de personal (sustituye el personal de los encargos del archivo) =====
+// Cabeceras admitidas (formato original de los responsables y formato exportado por la consulta)
+const STAFF_HEAD={'RESPONSABLE':'resp','PUESTO G E':'puesto','CODIGO':'emp','COD':'emp','NOMBRE':'name','OBS':'obs','FECHA OBS':'obsDate','FECHA':'obsDate',
+ 'PUESTO COMPARTIDO':'shared','MOTIVO PUESTO COMPARTIDO':'sharedReason','CORREO':'email','MAIL':'email','MOVIL':'mobile','DNI':'dni',
+ 'PUESTO DE TRABAJO':'role','PUESTO TRABAJO':'role','GRUPO':'group','CENTRO DE TRABAJO':'center','DIRECCION':'address','FESTIVO LOCAL':'holiday',
+ 'PUESTO DE PREVENCION':'prevention','PUESTO PREVENCION':'prevention','HORAS':'hours','TIPO DE CONTRATO':'contract','COORDINACION':'coord',
+ 'ENCARGO':'jobKey','ACCION':'actionRaw','NOMBRE2':'actionText2','TITULACION':'degree','TELETRABAJO':'telework','TARIFA EPI':'epi','TARIFA':'epi',
+ 'EXPEDIENTE':'exp','NOMBRE DEL ENCARGO':'jobName','NOMBRE ENCARGO':'jobName','FIN DEL ENCARGO':'jobEnd','FECHA FIN':'jobEnd'};
+const hnorm=v=>String(v??'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+const cleanTxt=v=>{ if(v==null)return ''; if(typeof v==='number')return v===0?'':String(v); const t=String(v).replace(/[\t ]+/g,' ').replace(/\s+/g,' ').trim(); return t==='0'?'':t; };
+const PART=new Set(['de','del','la','las','los','el','y','e','da','do','dos']);
+const titleCase=t=>String(t||'').toLowerCase().replace(/[\p{L}\p{N}]+/gu,(w,off)=>(off>0&&PART.has(w))?w:w[0].toUpperCase()+w.slice(1));
+const LOCALIDADES={'merida':'Mérida','caceres':'Cáceres','badajoz':'Badajoz','alcantara':'Alcántara','malpartida de caceres':'Malpartida de Cáceres','castanar de ibor':'Castañar de Ibor'};
+const CONTRATOS={'100':'100 - Ordinario indefinido','189':'189 - Transformación a indefinido','300':'300 - Indefinido fijo discontinuo','406':'406 - Fondos europeos','410':'410 - De interinidad'};
+function cellDate(v){
+ if(v instanceof Date&&!isNaN(v)) return xlsDate(v).split('-').reverse().join('/');
+ if(typeof v==='number'){ if(v<20000) return ''; const d=new Date(Date.UTC(1899,11,30)+Math.round(v)*864e5); return d.toISOString().slice(0,10).split('-').reverse().join('/'); }
+ return cleanTxt(v);
+}
+function normalizeStaffRow(raw){
+ const p={};
+ const nameRaw=cleanTxt(raw.name), m=nameRaw.match(/^(\d{3,7})\s+(.+)$/);
+ const codCol=cleanTxt(raw.emp);
+ p.emp=m?m[1].padStart(6,'0'):(/^\d+$/.test(codCol)?codCol.padStart(6,'0'):codCol);
+ const base=m?m[2]:nameRaw;
+ p.name=(/[a-záéíóúñ]/.test(base)||/^(vacante|excedencia|interinidad)/i.test(base))?base:titleCase(base);
+ p.puesto=cleanTxt(raw.puesto).toUpperCase();
+ for(const k of ['resp','obs','shared','sharedReason','dni','role','center','address','prevention','exp','jobName','epi']) p[k]=cleanTxt(raw[k]);
+ p.dni=p.dni.toUpperCase();
+ p.email=cleanTxt(raw.email).toLowerCase();
+ p.mobile=cleanTxt(raw.mobile);
+ p.group=cleanTxt(raw.group).toUpperCase();
+ const h=parseFloat(String(raw.hours??'').replace(',','.')); p.hours=isFinite(h)&&h>0?h:'';
+ const cc=(cleanTxt(raw.contract).match(/^\d{3}/)||[''])[0]; p.contract=CONTRATOS[cc]||cleanTxt(raw.contract);
+ let loc=cleanTxt(raw.holiday); if(loc){ const k=loc.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); loc=LOCALIDADES[k]||titleCase(loc); } p.holiday=loc;
+ const co=cleanTxt(raw.coord).replace(/^\d+\s+/,''); p.coord=co&&!/[a-záéíóúñ]/.test(co)?titleCase(co):co;
+ let tele=cleanTxt(raw.telework); if(/^presencial$/i.test(tele)) tele='Presencial'; p.telework=tele;
+ p.obsDate=cellDate(raw.obsDate); p.jobEnd=cellDate(raw.jobEnd);
+ // Encargo y acción: primero del PUESTO G.E.
+ const pp=puestoParts(p.puesto);
+ let acc=cleanTxt(raw.actionRaw), accText='';
+ if(/^\d{1,4}$/.test(acc)) acc=acc.padStart(4,'0'); else if(acc){ accText=acc; acc=''; }
+ let jk=cleanTxt(raw.jobKey);
+ if(jk&&!jk.includes('_')&&acc) jk=jk+'_'+acc;
+ if(!jk&&pp) jk=pp.code+'_'+pp.group.replace('.','');
+ p.jobKey=jk;
+ p.actionText=accText||cleanTxt(raw.actionText2);
+ const ac=p.actionText.match(/^(\d{2})[.,](\d{2})[.,](\d{2})/); p.actionCode=ac?ac[1]+'.'+ac[2]+'.'+ac[3]:'';
+ const deg=cleanTxt(raw.degree); p.degree=deg&&deg===p.actionText?'':deg;
+ p.actionGroup=pp?pp.group:(groupOf(p.actionText)||(/^\d{4}$/.test(acc)?acc.slice(0,2)+'.'+acc.slice(2):''));
+ return p;
+}
+// ===== Importación del Excel de personal: sustituye el personal de las ACCIONES que vengan en el archivo =====
 async function importStaffFile(file){
  try{
   await loadXlsxLib();
   const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
   const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''});
-  const norm=v=>normalize(String(v??'').trim());
-  const hi=rows.findIndex(r=>r.some(c=>norm(c)==='nombre')&&r.some(c=>norm(c)==='puesto g.e.'));
-  if(hi<0) throw new Error('No se encuentra la fila de títulos (debe tener las columnas «Puesto G.E.» y «Nombre»).');
-  const head=rows[hi].map(norm), col={};
-  for(const [k,label] of STAFF_COLS){ const i=head.indexOf(norm(label)); if(i>=0) col[k]=i; }
+  const hi=rows.findIndex(r=>r.some(c=>hnorm(c)==='PUESTO G E'));
+  if(hi<0) throw new Error('No se encuentra la fila de títulos (debe tener la columna «PUESTO G.E.»).');
+  const col={}; rows[hi].forEach((c,i)=>{ const k=STAFF_HEAD[hnorm(c)]; if(k&&!(k in col)) col[k]=i; });
+  if(!('name' in col)) throw new Error('Falta la columna «NOMBRE».');
   const byExp=new Map(data.jobs.filter(j=>j.exp).map(j=>[j.exp,j])), byCode=new Map(data.jobs.filter(j=>j.code).map(j=>[j.code,j]));
   const people=[], unmatched=[];
   for(const r of rows.slice(hi+1)){
-   if(!r.some(c=>String(c??'').trim())) continue;
-   const p={};
-   for(const [k] of STAFF_COLS) if(k in col){ let v=r[col[k]]; if(v instanceof Date) v=xlsDate(v).split('-').reverse().join('/'); p[k]=typeof v==='number'?v:String(v??'').trim(); }
+   const raw={}; for(const k in col) raw[k]=r[col[k]];
+   if(!cleanTxt(raw.name)&&!cleanTxt(raw.puesto)) continue;
+   const p=normalizeStaffRow(raw);
    if(!p.name) continue;
-   if(typeof p.emp==='number') p.emp=String(p.emp).padStart(6,'0');
-   const ac=String(p.actionText||'').match(/^(\d{2})[.,](\d{2})[.,](\d{2})/);
-   p.actionCode=ac?ac[1]+'.'+ac[2]+'.'+ac[3]:'';
-   p.actionGroup=staffGroup(p);
-   const job=byExp.get(String(p.exp||''))||byCode.get(String(p.jobKey||'').split('_')[0]);
+   const code=(puestoParts(p.puesto)||{}).code||String(p.jobKey||'').split('_')[0];
+   const job=byCode.get(code)||byExp.get(p.exp);
    p.job=job?job.id:'';
    if(!job) unmatched.push(p.name);
    people.push(p);
   }
   if(!people.length) throw new Error('El archivo no contiene personas.');
-  const jobIds=[...new Set(people.map(p=>p.job).filter(Boolean))];
-  const replaced=data.staff.filter(p=>jobIds.includes(p.job));
-  const per=jobIds.map(id=>{const j=data.jobs.find(x=>x.id===id);return '· '+(j.code||'')+': '+people.filter(p=>p.job===id).length+' personas';}).join('\n');
+  // Responsable: si el Excel no lo trae, se pregunta (por defecto, el que ya tenían esas acciones)
+  if(!('resp' in col)){
+   const keys=new Set(people.map(p=>p.job+'|'+p.actionGroup)), cnt={};
+   for(const s of data.staff) if(keys.has(s.job+'|'+staffGroup(s))&&s.resp) cnt[s.resp]=(cnt[s.resp]||0)+1;
+   const def=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+   const resp=prompt('Este Excel no indica el responsable. ¿De quién es el personal de este archivo?',def);
+   if(resp===null) return;
+   for(const p of people) p.resp=resp.trim();
+  }
+  // Se sustituye solo el personal de cada (encargo, acción, responsable) presente en el archivo
+  const key=x=>x.job+'|'+(x.actionGroup||'')+'|'+String(x.resp||'').trim().toLowerCase();
+  const keys=new Set(people.filter(p=>p.job).map(key));
+  // Los registros sin responsable (importaciones antiguas) se sustituyen por el Excel que traiga esa misma acción
+  const actKeys=new Set(people.filter(p=>p.job).map(p=>p.job+'|'+(p.actionGroup||'')));
+  const jobOf=s=>s.job||(byCode.get((puestoParts(s.puesto)||{}).code)||{}).id||'';
+  const replaced=data.staff.filter(s=>{ const r=String(s.resp||'').trim().toLowerCase(), ka=jobOf(s)+'|'+staffGroup(s); return keys.has(ka+'|'+r)||(!r&&actKeys.has(ka)); });
+  const per=[...keys].sort().map(k=>{ const [id,g]=k.split('|'), j=data.jobs.find(x=>x.id===id), any=people.find(p=>key(p)===k);
+   return '· '+(j.code||'')+' · acción '+(g||'—')+(any.resp?' · '+any.resp:'')+': '+people.filter(p=>key(p)===k).length+' personas'; }).join('\n');
   if(!confirm('Se van a importar '+people.length+' personas de «'+file.name+'»:\n'+per
    +(unmatched.length?'\n· Sin encargo reconocido: '+unmatched.length:'')
-   +'\n\nSe sustituirá el personal actual de esos encargos ('+replaced.length+' adscripciones).\n¿Continuar?')) return;
+   +'\n\nSe sustituirá el personal actual de esas acciones de ese responsable ('+replaced.length+' adscripciones). El resto no se toca.\n¿Continuar?')) return;
   const ops=[...replaced.map(p=>['del',p.id]),...people.map(p=>['set',globalThis.crypto.randomUUID(),p])];
   for(let i=0;i<ops.length;i+=400){
    const batch=db.batch();
@@ -889,7 +953,7 @@ byId('backupFile').onchange=async()=>{
   const jobs=cols[collections.jobs].filter(d=>d&&typeof d.id==='string'&&d.id), staff=cols[collections.staff].filter(d=>d&&typeof d.id==='string'&&d.id);
   const fecha=copy.fecha?new Date(copy.fecha).toLocaleString('es-ES'):'fecha desconocida';
   if(!confirm('Restaurar la copia del '+fecha+':\n· '+jobs.length+' encargos\n· '+staff.length+' adscripciones de personal\n\n'
-   +'La base de datos quedará EXACTAMENTE como en la copia: se sustituirá lo que hay ahora ('+data.jobs.length+(data.jobs.length===1?' encargo':' encargos')+' y '+data.staff.length+(data.staff.length===1?' adscripción':' adscripciones')+') '
+   +'La base de datos quedará EXACTAMENTE como en la copia: se sustituirán los '+data.jobs.length+' encargos y las '+data.staff.length+' adscripciones actuales '
    +'(lo creado después de la copia se eliminará).\n\nAntes se descargará automáticamente una copia del estado actual.\n\n¿Continuar?')) return;
   downloadBackup('antes_de_restaurar');
   const ops=[];
