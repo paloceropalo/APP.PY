@@ -17,7 +17,8 @@ rules_version = '2';
 //
 // GESTIÓN FORESTAL (gestion_forestal.html)
 // - Sin inicio de sesión: quien tenga el enlace puede ver y editar
-//   los encargos (gf_encargos) y el personal adscrito (gf_adscripciones).
+//   los encargos (gf_encargos), el personal adscrito (gf_adscripciones)
+//   y las altas/bajas (gf_movimientos).
 //
 // IMPORTANTE: como este proyecto tiene activado el acceso anónimo y con Google,
 // "haber iniciado sesión" ya NO basta para ser administrador: se exige el correo.
@@ -224,6 +225,17 @@ service cloud.firestore {
         && request.resource.data.name.size() > 0
         && request.resource.data.name.size() <= 300
         && request.resource.data.job is string;
+    }
+
+    // Altas/Bajas del personal (bajas por enfermedad IT y altas)
+    match /gf_movimientos/{id} {
+      allow read, delete: if true;
+      allow create, update: if request.resource.data.id == id
+        && request.resource.data.tipo in ['baja', 'alta']
+        && request.resource.data.fecha is string
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 300;
     }
 
     // Cualquier otra colección queda cerrada.

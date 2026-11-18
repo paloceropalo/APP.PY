@@ -174,6 +174,9 @@ dialog::backdrop{background:rgba(10,30,20,.45)}
 .dlg-f .sp{flex:1}
 .linkbtn{border:0;background:none;color:var(--rojo);cursor:pointer;text-decoration:underline;padding:0}
 .live{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--apagado)}.live:before{content:'';width:7px;height:7px;border-radius:50%;background:#a0a897}.live.ok:before{background:#638b32}.live.err{color:var(--rojo)}.live.err:before{background:var(--rojo)}
+tbody tr.it td{background:#fdecea}tbody tr.it:hover td{background:#f9dcd8}tbody tr.it.sel td{background:#f6cfca}tbody tr.it .nm{color:#8e2a20}tbody tr.it td.c1{box-shadow:inset 4px 0 0 #c0392b}
+.tag-it{background:#c0392b;color:#fff;font-weight:600}
+.dh.it{background:#fdecea}.aviso-it{background:#fbe3df;color:#8e2a20}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--tinta);color:#fff;padding:8px 16px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50}
 #toast.on{opacity:1}
 
@@ -280,7 +283,11 @@ function fecha(v){
 const firebaseConfig={apiKey:"AIzaSyC4GTuNF806rml_rfzwvzkr_rqucfzijxo",authDomain:"cuadrante-secona.firebaseapp.com",projectId:"cuadrante-secona",
  storageBucket:"cuadrante-secona.firebasestorage.app",messagingSenderId:"175128885677",appId:"1:175128885677:web:be910a122535a9bd4cc924"};
 const COL='gf_adscripciones';
-let fdb=null, BASE=[];
+let fdb=null, BASE=[], MOVES=[];
+/* Bajas IT en curso (registro «Altas/Bajas»): clave = código de empleado o nombre + puesto */
+const personKey=d=>{ const e=txt(d.emp).replace(/^0+/,''); return e?'e:'+e:'n:'+strip(txt(d.name)).toLowerCase().replace(/\s+/g,' ').trim()+'|'+txt(d.puesto).toUpperCase(); };
+function itMap(){ const m=new Map(); [...MOVES].sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||''))||String(a.creado||'').localeCompare(String(b.creado||'')))
+  .forEach(x=>{ const k=x.pkey||personKey(x); if(x.tipo==='baja')m.set(k,x); else if(x.tipo==='alta')m.delete(k); }); return m; }
 const dmy=iso=>iso?iso.split('-').reverse().join('/'):'';
 const numOrNull=v=>{const n=parseFloat(String(v??'').replace(',','.'));return isFinite(n)&&n>0?n:null;};
 /* documento de la base de datos → registro de esta consulta */
@@ -328,6 +335,7 @@ const FACETS=[
  {id:'centro',label:'Centro de trabajo',get:r=>r.centro},
  {id:'puesto',label:'Puesto de trabajo',get:r=>r.puesto},
  {id:'situacion',label:'Puesto compartido',get:situacion},
+ {id:'baja',label:'Baja IT',get:r=>r.it?'De baja por enfermedad (IT)':'De alta'},
  {id:'horas',label:'Jornada',get:r=>fmtH(r.horas),sort:'alpha'},
  {id:'teletrabajo',label:'Teletrabajo',get:r=>r.teletrabajo},
  {id:'coord',label:'Coordinación',get:r=>r.coord},
@@ -394,7 +402,8 @@ const editado=r=>r.orig&&Object.keys(r.orig).length>0;
 /* ============ Datos derivados ============ */
 function rebuild(){
   closePop();
-  ALL=BASE.map(r=>({...r}));
+  const IT=itMap();
+  ALL=BASE.map(r=>{ const b=IT.get(personKey(r._doc||{})); return {...r,it:b?{desde:b.fecha,notas:txt(b.notes)}:null}; });
   RESPS=[...new Set(BASE.map(r=>r.resp).filter(Boolean))].sort(coll.compare);
   $('#segResp').innerHTML='<button type="button" data-resp="">Todos</button>'+RESPS.map(k=>`<button type="button" data-resp="${esc(k)}">${esc(k)}</button>`).join('');
   if(S.resp&&!RESPS.includes(S.resp))S.resp='';
@@ -523,7 +532,7 @@ function cell(r,c,i){
   const cl=i===0?' class="c1"':i===1?' class="c2"':'';
   switch(c.id){
     case 'puestoGE': return `<td${cl} title="${esc(r.puestoGE)}">${val(r.puestoGE)}${rolTag(r)}</td>`;
-    case 'nombre': return `<td${cl} title="${esc(r.nombre)}"><span class="nm">${esc(r.nombre)}</span>${r.obs?`<span class="tag tag-obs" title="${esc(obsTitle(r))}">${esc(r.obs)}</span>`:''}${editado(r)?'<span class="tag tag-ed" title="Registro editado">✎</span>':''}</td>`;
+    case 'nombre': return `<td${cl} title="${esc(r.nombre)}${r.it?' · de baja por enfermedad (IT) desde '+esc(fmtFecha(r.it.desde)):''}"><span class="nm">${esc(r.nombre)}</span>${r.it?`<span class="tag tag-it">IT ${esc(fmtFecha(r.it.desde))}</span>`:''}${r.obs?`<span class="tag tag-obs" title="${esc(obsTitle(r))}">${esc(r.obs)}</span>`:''}${editado(r)?'<span class="tag tag-ed" title="Registro editado">✎</span>':''}</td>`;
     case 'comp': { const t=compText(r); return `<td${cl} title="${esc(t)}">${t?esc(t)+(r.motivoEf?'':' <span class="dash">(motivo sin indicar)</span>'):dash}</td>`; }
     case 'grupo': return `<td><span class="gr">${esc(r.grupo)}</span></td>`;
     case 'resp': return `<td><span class="pill ${esc(pillCls(r.resp))}">${esc(r.resp)}</span></td>`;
@@ -535,7 +544,7 @@ function cell(r,c,i){
 function renderTable(){
   const cols=renderHead();
   LIST=sortRows(ALL.filter(r=>passes(r)));
-  $('#tbody').innerHTML=LIST.map(r=>`<tr data-id="${r.id}" tabindex="0" class="${S.cur===r.id?'sel':''}${r.rolEf==='titular'?' tit':''}">${cols.map((c,i)=>cell(r,c,i)).join('')}</tr>`).join('');
+  $('#tbody').innerHTML=LIST.map(r=>`<tr data-id="${r.id}" tabindex="0" class="${S.cur===r.id?'sel':''}${r.rolEf==='titular'?' tit':''}${r.it?' it':''}">${cols.map((c,i)=>cell(r,c,i)).join('')}</tr>`).join('');
   const emp=$('#empty');
   if(!ALL.length){
     emp.hidden=false; $('#tbl').style.display='none';
@@ -675,7 +684,7 @@ function renderDrawer(){
   const r=ALL.find(x=>x.id===S.cur), d=$('#drawer'); if(!r){closeDrawer();return;}
   const i=LIST.findIndex(x=>x.id===r.id), E=S.edit, ne=editado(r)?Object.keys(r.orig).length:0;
   d.innerHTML=`<form id="editForm" autocomplete="off">
-  <div class="dh ${r.rolEf==='titular'?'titular':''}">
+  <div class="dh ${r.rolEf==='titular'?'titular':''} ${r.it?'it':''}">
     <div class="row1">
       <button class="ib" type="button" data-nav="-1" aria-label="Anterior" ${(E||i<=0)?'disabled':''}>‹</button>
       <button class="ib" type="button" data-nav="1" aria-label="Siguiente" ${(E||i<0||i>=LIST.length-1)?'disabled':''}>›</button>
@@ -686,6 +695,7 @@ function renderDrawer(){
     </div>
     ${E?`<input type="text" name="nombre" aria-label="Nombre" value="${esc(r.nombre)}">`:`<h2>${esc(r.nombre)} ${rolTag(r)}</h2>`}
     <div class="sub">${esc(r.puestoGE)||''}${r.cod?' · Cód. '+esc(r.cod):''}${E?' · modo edición':''}</div>
+    ${r.it?`<div class="aviso aviso-it">De baja por enfermedad (IT) desde el <b>${esc(fmtFecha(r.it.desde))}</b>${r.it.notas?' · '+esc(r.it.notas):''}. El alta se registra en la pestaña «Altas/Bajas».</div>`:''}
     ${(!E&&ne)?`<div class="aviso">Registro con ${ne} campo${ne>1?'s':''} modificado${ne>1?'s':''} respecto al Excel. <button class="btn sm" type="button" data-restore>Deshacer cambios</button></div>`:''}
   </div>
   <div class="db">
@@ -795,6 +805,7 @@ $('#btnExport').addEventListener('click',()=>{
       live.className='live ok'; live.textContent='Datos en tiempo real';
       if(!S.edit)rebuild(); else renderInfo();
     },err=>{ console.error(err); live.className='live err'; live.textContent='Sin conexión con la base de datos ('+(err.code||err.message)+')'; });
+    fdb.collection('gf_movimientos').onSnapshot(snap=>{ MOVES=snap.docs.map(d=>({...d.data(),id:d.id})); if(!S.edit)rebuild(); },err=>console.warn('Altas/Bajas no disponibles:',err.code||err.message));
   }catch(err){ console.error(err); live.className='live err'; live.textContent='No se pudo conectar con Firebase'; }
 })();
 </script>
