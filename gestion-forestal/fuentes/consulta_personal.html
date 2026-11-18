@@ -180,6 +180,7 @@ tbody tr.it td{background:#fdecea}tbody tr.it:hover td{background:#f9dcd8}tbody 
 tbody tr.plaza td{background:#e9f1f9}tbody tr.plaza:hover td{background:#dce9f5}tbody tr.plaza.sel td{background:#cfe0f0}tbody tr.plaza .nm{color:#24557d}tbody tr.plaza td.c1{box-shadow:inset 4px 0 0 #3a6fa0}
 .tag-plaza{background:#3a6fa0;color:#fff;font-weight:600}
 .dh.plaza{background:#e9f1f9}.aviso-plaza{background:#e2edf6;color:#24557d}
+tbody tr.sus td.c1,tbody tr.sus td.cc,tbody tr.sus .nm{color:#1f5fa8!important;font-weight:600}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--tinta);color:#fff;padding:8px 16px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50}
 #toast.on{opacity:1}
 
@@ -245,6 +246,8 @@ const PART=new Set(['de','del','la','las','los','el','y','e','da','do','dos']);
 const titulo=s=>String(s||'').toLowerCase().replace(/[\p{L}\p{N}]+/gu,(w,off)=>(off>0&&PART.has(w))?w:w[0].toUpperCase()+w.slice(1));
 const dash='<span class="dash">—</span>';
 /* color de la etiqueta del responsable según su nombre de pila (Marcos, Marta…) */
+/* Interinos (contrato 410 u obs. INT) y sustitutos: Puesto G.E., código y nombre en azul */
+const esSus=r=>/^410/.test(String(r.contrato||''))||String(r.obs||'').toUpperCase()==='INT'||r.rolEf==='sustituto'||r.rol==='sustituto'||/sustitut/i.test(String((r._doc||{}).shared||''));
 const pillCls=v=>titulo(String(v||'').trim().split(/\s+/)[0]||'');
 const val=v=>(v===''||v==null)?dash:esc(v);
 const pad2=n=>String(n).padStart(2,'0');
@@ -538,6 +541,7 @@ function cell(r,c,i){
     case 'puestoGE': return `<td${cl} title="${esc(r.puestoGE)}">${val(r.puestoGE)}${rolTag(r)}</td>`;
     case 'nombre': return `<td${cl} title="${esc(r.nombre)}${r.it?' · de baja por enfermedad (IT) desde '+esc(fmtFecha(r.it.desde)):''}"><span class="nm">${esc(r.nombre)}</span>${r.it?`<span class="tag tag-it">IT ${esc(fmtFecha(r.it.desde))}</span>`:''}${r.plaza?`<span class="tag tag-plaza" title="${esc(r.vacMotivo?'Motivo: '+r.vacMotivo:'Motivo sin indicar')}">Plaza no cubierta</span>`:''}${r.obs?`<span class="tag tag-obs" title="${esc(obsTitle(r))}">${esc(r.obs)}</span>`:''}${editado(r)?'<span class="tag tag-ed" title="Registro editado">✎</span>':''}</td>`;
     case 'comp': { const t=compText(r); return `<td${cl} title="${esc(t)}">${t?esc(t)+(r.motivoEf?'':' <span class="dash">(motivo sin indicar)</span>'):dash}</td>`; }
+    case 'cod': return `<td class="cc">${val(r.cod)}</td>`;
     case 'grupo': return `<td><span class="gr">${esc(r.grupo)}</span></td>`;
     case 'resp': return `<td><span class="pill ${esc(pillCls(r.resp))}">${esc(r.resp)}</span></td>`;
     case 'horas': return `<td>${r.horas==null?dash:fmtH(r.horas)}</td>`;
@@ -548,7 +552,7 @@ function cell(r,c,i){
 function renderTable(){
   const cols=renderHead();
   LIST=sortRows(ALL.filter(r=>passes(r)));
-  $('#tbody').innerHTML=LIST.map(r=>`<tr data-id="${r.id}" tabindex="0" class="${S.cur===r.id?'sel':''}${r.rolEf==='titular'?' tit':''}${r.it?' it':''}${r.plaza?' plaza':''}">${cols.map((c,i)=>cell(r,c,i)).join('')}</tr>`).join('');
+  $('#tbody').innerHTML=LIST.map(r=>`<tr data-id="${r.id}" tabindex="0" class="${S.cur===r.id?'sel':''}${r.rolEf==='titular'?' tit':''}${r.it?' it':''}${r.plaza?' plaza':''}${esSus(r)?' sus':''}">${cols.map((c,i)=>cell(r,c,i)).join('')}</tr>`).join('');
   const emp=$('#empty');
   if(!ALL.length){
     emp.hidden=false; $('#tbl').style.display='none';
