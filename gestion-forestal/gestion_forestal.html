@@ -741,6 +741,23 @@ const STAFF_COLS=[['resp','Responsable'],['puesto','Puesto G.E.'],['emp','Códig
  ['contract','Tipo de contrato'],['coord','Coordinación'],['jobKey','Encargo'],['actionText','Acción'],['degree','Titulación'],['telework','Teletrabajo'],
  ['epi','Tarifa EPI'],['exp','Expediente'],['jobName','Nombre del encargo'],['jobEnd','Fin del encargo']];
 // Formulario de una adscripción: [campo, etiqueta, tipo, empieza fila]
+// Valores ya existentes en el personal (para los desplegables del formulario)
+const STAFF_SUGGEST=['role','degree','coord','center','address','holiday','hours','contract','telework','prevention','epi','resp','obs','shared','sharedReason'];
+function staffValues(k){ const m=new Map(); for(const p of data.staff){ const v=String(p[k]??'').trim(); if(v&&!m.has(v.toLowerCase())) m.set(v.toLowerCase(),v); } return [...m.values()].sort((a,b)=>a.localeCompare(b,'es',{numeric:true})); }
+// Puestos G.E. vacantes de un encargo y acción: filas sin trabajador con código y excedencias/bajas voluntarias sin sustituto
+function vacantPuestos(jobId,group){
+ const act=itActive(), out=[], seen=new Set();
+ for(const p of data.staff){
+  if(p.job!==jobId||(group&&staffGroup(p)!==group)) continue;
+  const pu=String(p.puesto||'').trim().toUpperCase(); if(!pu||seen.has(pu)) continue;
+  const lv=leaveVacancy(p,act);
+  if(isVacant(p)){ seen.add(pu); out.push({puesto:pu,src:p,placeholder:true,label:pu+' · '+(p.name||'Vacante')}); }
+  else if(lv){ seen.add(pu); out.push({puesto:pu,src:p,placeholder:false,label:pu+' · '+BAJA_MOTIVOS[motivoDe(lv)]+' de '+(p.name||'')+' (sin sustituto)'}); }
+ }
+ return out.sort((a,b)=>a.puesto.localeCompare(b.puesto,'es',{numeric:true}));
+}
+let vacSource=null; // fila de vacante elegida al añadir una persona (la persona nueva ocupa esa fila)
+let vacLeave=null;  // persona en excedencia/baja voluntaria cuyo puesto se cubre (se actualiza su movimiento)
 const STAFF_FORM=[['emp','Código de empleado'],['name','Nombre y apellidos'],['dni','DNI'],
  ['job','Encargo','select',true],['actionGroup','Acción','actionsel'],['puesto','Puesto G.E.'],
  ['role','Puesto de trabajo','',true],['group','Grupo'],['degree','Titulación'],
@@ -916,6 +933,28 @@ function openEditor(item,job,kind,person){
   const jobSel=byId('fields').querySelector('[name=job]'), actSel=byId('fields').querySelector('[name=actionGroup]');
   fillActionSelect(actSel,jobSel.value,item?staffGroup(item):(staffAction||''));
   jobSel.onchange=()=>fillActionSelect(actSel,jobSel.value,'');
+  const P=n=>byId('fields').querySelector('[name='+n+']');
+  // Desplegables con los valores existentes (se puede escribir otro)
+  for(const k of STAFF_SUGGEST){ const inp=P(k); if(!inp) continue; let dl=byId('dl-staff-'+k); if(!dl){ dl=node('datalist',undefined,document.body); dl.id='dl-staff-'+k; }
+   dl.replaceChildren(); for(const v of staffValues(k)) node('option',undefined,dl).value=v; inp.setAttribute('list',dl.id); inp.autocomplete='off'; }
+  { const g=P('group'), sel=document.createElement('select'); sel.name='group'; for(const v of ['','A','B','C','D']) node('option',v||'—',sel).value=v;
+    const cur=String(item?.group||'').toUpperCase(); if(cur&&!['A','B','C','D'].includes(cur)) node('option',cur,sel).value=cur; sel.value=cur; g.replaceWith(sel); }
+  vacSource=null; vacLeave=null;
+  if(!item){
+   // Puesto G.E.: solo los vacantes del encargo y la acción elegidos
+   const old=P('puesto'), sel=document.createElement('select'); sel.name='puesto'; sel.required=true; old.replaceWith(sel);
+   const other=document.createElement('input'); other.name='puestoNuevo'; other.placeholder='Escribe el PUESTO G.E. nuevo (p. ej. E24051_1101_C25)'; other.hidden=true; sel.after(other);
+   let opts=[];
+   const fill=()=>{ opts=vacantPuestos(jobSel.value,actSel.value); sel.replaceChildren();
+    node('option',opts.length?'— Elige un puesto vacante —':'— No hay puestos vacantes en esta acción —',sel).value='';
+    opts.forEach((o,i)=>node('option',o.label,sel).value=String(i));
+    node('option','Otro: escribir un PUESTO G.E. nuevo',sel).value='__new'; sel.value=''; other.hidden=true; other.required=false; vacSource=null; vacLeave=null; };
+   const prefill=o=>{ for(const k of ['role','group','center','address','holiday','prevention','epi','resp','coord','hours','contract','telework']){ const f=P(k), v=o.src[k]; if(f&&!String(f.value||'').trim()&&v!==undefined&&v!==null&&String(v).trim()) f.value=String(v); } };
+   sel.onchange=()=>{ other.hidden=sel.value!=='__new'; other.required=sel.value==='__new'; vacSource=null; vacLeave=null;
+    const o=opts[+sel.value]; if(sel.value!==''&&sel.value!=='__new'&&o){ prefill(o); if(o.placeholder) vacSource=o.src; else vacLeave=o.src; } };
+   const prevJob=jobSel.onchange; jobSel.onchange=()=>{ prevJob(); fill(); }; actSel.onchange=fill;
+   fill();
+  }
  }
  byId('deleteStaff').hidden=!((fm==='staff'||fm==='moves')&&item&&item.id);
  byId('deleteStaff').textContent=fm==='moves'?'Eliminar movimiento':'Retirar adscripción';
@@ -978,6 +1017,14 @@ byId('form').onsubmit=async event=>{
   }
   values.actions.sort(byAction);
  }
+ if(formMode==='staff'&&!editing){
+  if(values.puesto==='__new') values.puesto=String(values.puestoNuevo||'').trim().toUpperCase();
+  else if(/^\d+$/.test(values.puesto||'')){ const o=vacantPuestos(values.job,values.actionGroup)[+values.puesto]; values.puesto=o?o.puesto:''; }
+  delete values.puestoNuevo;
+  if(!values.puesto) return error('Elige el PUESTO G.E. vacante (o escribe uno nuevo).');
+ }
+ // Si el puesto era una fila de vacante del Excel, la persona nueva ocupa esa misma fila
+ if(formMode==='staff'&&!editing&&vacSource&&String(vacSource.puesto||'').trim().toUpperCase()===values.puesto){ editing={...vacSource,vacMotivo:''}; }
  if(formMode==='staff'){
   const cand={...(editing||{}),...values}, k=dupKey(cand), other=data.staff.find(x=>x.id!==editing?.id&&dupKey(x)===k);
   if(other) return error('Esta persona ya está adscrita en el puesto '+(cand.puesto||'')+' (responsable: '+(other.resp||'—')+'). No se puede duplicar; edita el registro existente.');
@@ -986,6 +1033,12 @@ byId('form').onsubmit=async event=>{
  const record={...(formMode==='staff'&&editing?editing:{}),...values,id:editing?.id||globalThis.crypto.randomUUID()};
  const btn=byId('form').querySelector('button.primary');btn.disabled=true;
  const ok=await saveRecord(formMode,record);
+ // Si cubre el puesto de alguien en excedencia o baja voluntaria, su movimiento pasa a «Sustituido por»
+ if(ok&&formMode==='staff'&&vacLeave&&String(vacLeave.puesto||'').trim().toUpperCase()===String(record.puesto||'').trim().toUpperCase()){
+  const mv=itActive().get(personKey(vacLeave));
+  if(mv) await saveRecord('moves',{...mv,cobertura:'sustituido',sustituto:String(record.name||''),sustitutoEmp:String(record.emp||''),actualizado:new Date().toISOString()});
+  vacLeave=null;
+ }
  btn.disabled=false;
  if(!ok) return error('No se pudieron guardar los cambios.');
  byId('editor').close();byId('search').value='';show();
