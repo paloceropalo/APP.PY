@@ -236,6 +236,8 @@ const canon=s=>strip(s).toLowerCase().replace(/[-–—_.,;:]+/g,' ').replace(/\
 const PART=new Set(['de','del','la','las','los','el','y','e','da','do','dos']);
 const titulo=s=>String(s||'').toLowerCase().replace(/[\p{L}\p{N}]+/gu,(w,off)=>(off>0&&PART.has(w))?w:w[0].toUpperCase()+w.slice(1));
 const dash='<span class="dash">—</span>';
+/* color de la etiqueta del responsable según su nombre de pila (Marcos, Marta…) */
+const pillCls=v=>titulo(String(v||'').trim().split(/\s+/)[0]||'');
 const val=v=>(v===''||v==null)?dash:esc(v);
 const pad2=n=>String(n).padStart(2,'0');
 const fmtFecha=iso=>iso?iso.split('-').reverse().join('/'):'';
@@ -522,7 +524,7 @@ function cell(r,c,i){
     case 'nombre': return `<td${cl} title="${esc(r.nombre)}"><span class="nm">${esc(r.nombre)}</span>${r.obs?`<span class="tag tag-obs" title="${esc(obsTitle(r))}">${esc(r.obs)}</span>`:''}${editado(r)?'<span class="tag tag-ed" title="Registro editado">✎</span>':''}</td>`;
     case 'comp': { const t=compText(r); return `<td${cl} title="${esc(t)}">${t?esc(t)+(r.motivoEf?'':' <span class="dash">(motivo sin indicar)</span>'):dash}</td>`; }
     case 'grupo': return `<td><span class="gr">${esc(r.grupo)}</span></td>`;
-    case 'resp': return `<td><span class="pill ${esc(r.resp)}">${esc(r.resp)}</span></td>`;
+    case 'resp': return `<td><span class="pill ${esc(pillCls(r.resp))}">${esc(r.resp)}</span></td>`;
     case 'horas': return `<td>${r.horas==null?dash:fmtH(r.horas)}</td>`;
     case 'fechaFin': return `<td>${r.fechaFin?fmtFecha(r.fechaFin):dash}</td>`;
     default: { const v=c.val(r); return `<td${cl} title="${esc(v)}">${val(v)}</td>`; }
@@ -629,7 +631,7 @@ function field(r,[k,label,tp,o={}],E){
 }
 function compSection(r,E){
   if(!r.compartido.length)return '';
-  const otros=r.compartido.map(o=>`<div><button class="linklike" type="button" data-open="${o.id}">${esc(o.nombre)}</button> ${rolTag(o)} <span class="pill ${esc(o.resp)}">${esc(o.resp)}</span></div>`).join('');
+  const otros=r.compartido.map(o=>`<div><button class="linklike" type="button" data-open="${o.id}">${esc(o.nombre)}</button> ${rolTag(o)} <span class="pill ${esc(pillCls(o.resp))}">${esc(o.resp)}</span></div>`).join('');
   const aviso=`<p style="margin:0 0 6px;color:var(--apagado)">Este puesto G.E. figura con más de una persona.</p>`;
   if(!E){
     return `<section><h3>Puesto compartido</h3><div class="comp-box">${aviso}
@@ -653,7 +655,7 @@ function renderDrawer(){
       <button class="ib" type="button" data-nav="-1" aria-label="Anterior" ${(E||i<=0)?'disabled':''}>‹</button>
       <button class="ib" type="button" data-nav="1" aria-label="Siguiente" ${(E||i<0||i>=LIST.length-1)?'disabled':''}>›</button>
       <span class="sp"></span>
-      <span class="pill ${esc(r.resp)}">${esc(r.resp)}</span>
+      <span class="pill ${esc(pillCls(r.resp))}">${esc(r.resp)}</span>
       ${E?'':'<button class="ib txt" type="button" data-edit>✎ Editar</button>'}
       <button class="ib" type="button" data-close aria-label="Cerrar ficha">×</button>
     </div>
