@@ -212,7 +212,7 @@ details>.actions{background:#fff}
 <div class="section-top"><div><h2 id="sectionTitle">Registro de encargos</h2><p id="sectionDescription">Consulta la información y las acciones de cada encargo.</p></div><button type="button" id="expandAll" class="text-button">Desplegar todos</button></div>
 <div class="bar"><div class="search-box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke-width="1.7"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg><input id="search" type="search" aria-label="Buscar registros" placeholder="Buscar encargos"></div><button class="primary" id="add">Nuevo encargo</button><button type="button" id="importXls" title="Importar un encargo desde la estructura descargada de Gestión de Encomiendas">Importar Excel</button><input type="file" id="xlsFile" accept=".xls,.xlsx" hidden><button id="import" hidden></button></div>
 <div id="vacsFilters" class="staff-filters" hidden><label>Mostrar<select id="fVacs"><option value="">Todas las plazas no cubiertas</option><option value="sin">Solo las que no tienen motivo indicado</option></select></label></div>
-<div id="movesFilters" class="staff-filters" hidden><label>Mostrar<select id="fMoves"><option value="">Todos los movimientos</option><option value="activas">Solo bajas IT en curso</option><option value="vacantes">Bajas en curso sin cubrir (vacantes)</option><option value="baja">Solo bajas IT</option><option value="alta">Solo altas</option></select></label></div>
+<div id="movesFilters" class="staff-filters" hidden><label>Mostrar<select id="fMoves"><option value="">Todos los movimientos</option><option value="activas">Solo bajas IT en curso</option><option value="vacantes">Bajas en curso sin cubrir</option><option value="baja">Solo bajas IT</option><option value="alta">Solo altas</option></select></label></div>
 <div id="dupAlert" class="dup-alert" hidden></div>
 <div id="staffFilters" class="staff-filters" hidden><label>Encargo<select id="fJob"></select></label><label>Acción<select id="fAction"></select></label></div>
 <details id="xlsHelp" class="xls-help"><summary>¿Cómo obtener el Excel de un encargo?</summary><div class="xls-help-body"><ol><li>Entra en <b>GESTIÓN DE ENCOMIENDAS</b>.</li><li>Ve al menú <b>Presupuestos</b> → <b>Listado de presupuestos</b>.</li><li>Localiza el encargo (por ejemplo, por su código <i>202518AGE011</i>) y pulsa <b>Descargar estructura (xls)</b>. Se descarga un archivo como <i>estructura_convenio25011.xls</i>.</li><li>Aquí, pulsa <b>Importar Excel</b> y elige ese archivo. Se abrirá el formulario con los datos rellenos: revísalos y pulsa <b>Guardar</b>.</li></ol><p><b>Qué se importa:</b> el nombre del encargo, el código de convenio (nº de expediente y código del encargo) y, de cada acción, su código, nombre, anualidad, fechas e importe (columna «PPTO SIN CTE ADMIN GENERAL»). Las fechas del encargo se toman de la primera y la última acción.</p><p><b>Si el encargo ya existe</b>, se actualiza en lugar de duplicarse: se conservan los responsables de proyecto de cada acción y el resto de datos (fondo, servicio, jefe de servicio…).</p></div></details>
@@ -674,7 +674,7 @@ function coverGuess(w){ const pu=String(w?.puesto||'').trim().toUpperCase(), k=w
  return data.staff.find(x=>String(x.puesto||'').trim().toUpperCase()===pu&&personKey(x)!==k)||null; }
 function coverText(m){
  if(m.tipo!=='baja') return {t:'',cls:''};
- if(m.cobertura==='vacante') return {t:'Vacante (sin cubrir)',cls:'cov-vac'};
+ if(m.cobertura==='vacante') return {t:'Baja (sin cubrir)',cls:'cov-vac'};
  if(m.cobertura==='sustituido') return {t:'Sustituido por '+(m.sustituto||'—'),cls:'cov-sus'};
  const g=coverGuess(m); return g?{t:'Sustituido por '+g.name,cls:'cov-sus cov-guess'}:{t:'Sin indicar',cls:'cov-none'};
 }
@@ -836,7 +836,7 @@ function fillActionSelect(sel,jobId,value){
  sel.value=value||'';
 }
 const MOVE_FORM=[['tipo','Movimiento','tiposel'],['person','Trabajador (código · nombre · puesto)','personsel'],['fecha','Fecha','date'],['cobertura','Cobertura del puesto','coversel',true],['sustituto','Sustituido por','subsel'],['notes','Observaciones','long']];
-const COBERTURAS={sustituido:'Sustituido',vacante:'Vacante (sin cubrir)'};
+const COBERTURAS={sustituido:'Sustituido',vacante:'Baja (sin cubrir)'}; // «vacante» se reserva para la pestaña Plazas no cubiertas
 let formMode='jobs', movePerson=null;
 function openEditor(item,job,kind,person){
  refreshOwners();
@@ -922,7 +922,7 @@ byId('form').onsubmit=async event=>{
   let cover={};
   if(values.tipo==='baja'){
    if(values.cobertura==='sustituido'){
-    if(!values.sustituto) return error('Indica quién sustituye a esta persona, o marca el puesto como vacante.');
+    if(!values.sustituto) return error('Indica quién sustituye a esta persona, o marca la baja como «Baja (sin cubrir)».');
     const sp=data.staff.find(x=>personLabel(x)===values.sustituto);
     cover={cobertura:'sustituido',sustituto:sp?String(sp.name||''):values.sustituto,sustitutoEmp:sp?String(sp.emp||''):''};
    } else cover={cobertura:'vacante',sustituto:'',sustitutoEmp:''};
