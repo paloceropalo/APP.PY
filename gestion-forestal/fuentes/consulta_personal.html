@@ -248,6 +248,8 @@ const dash='<span class="dash">—</span>';
 /* color de la etiqueta del responsable según su nombre de pila (Marcos, Marta…) */
 /* Interinos (contrato 410 u obs. INT) y sustitutos: Puesto G.E., código y nombre en azul */
 const esSus=r=>/^410/.test(String(r.contrato||''))||String(r.obs||'').toUpperCase()==='INT'||r.rolEf==='sustituto'||r.rol==='sustituto'||/sustitut/i.test(String((r._doc||{}).shared||''));
+/* Tipos de baja del registro «Altas/Bajas» */
+const BAJAS={it:['IT','Baja por enfermedad (IT)'],exc_incomp:['Excedencia','Excedencia por incompatibilidad'],exc_interes:['Excedencia','Excedencia por interés particular'],voluntaria:['Baja voluntaria','Baja voluntaria']};
 const pillCls=v=>titulo(String(v||'').trim().split(/\s+/)[0]||'');
 const val=v=>(v===''||v==null)?dash:esc(v);
 const pad2=n=>String(n).padStart(2,'0');
@@ -341,7 +343,7 @@ const FACETS=[
  {id:'centro',label:'Centro de trabajo',get:r=>r.centro},
  {id:'puesto',label:'Puesto de trabajo',get:r=>r.puesto},
  {id:'situacion',label:'Puesto compartido',get:situacion},
- {id:'baja',label:'Baja IT',get:r=>r.it?'De baja por enfermedad (IT)':'De alta'},
+ {id:'baja',label:'Bajas',get:r=>r.it?BAJAS[r.it.motivo][1]:'De alta'},
  {id:'plaza',label:'Plaza no cubierta',get:r=>r.plaza?'Plaza no cubierta':'Cubierta por un trabajador'},
  {id:'horas',label:'Jornada',get:r=>fmtH(r.horas),sort:'alpha'},
  {id:'teletrabajo',label:'Teletrabajo',get:r=>r.teletrabajo},
@@ -410,7 +412,7 @@ const editado=r=>r.orig&&Object.keys(r.orig).length>0;
 function rebuild(){
   closePop();
   const IT=itMap();
-  ALL=BASE.map(r=>{ const b=IT.get(personKey(r._doc||{})); return {...r,it:b?{desde:b.fecha,notas:txt(b.notes)}:null,plaza:!/^\d+$/.test(String(r.cod||'').trim()),vacMotivo:txt((r._doc||{}).vacMotivo)}; });
+  ALL=BASE.map(r=>{ const b=IT.get(personKey(r._doc||{})); return {...r,it:b?{desde:b.fecha,notas:txt(b.notes),motivo:BAJAS[b.motivo]?b.motivo:'it'}:null,plaza:!/^\d+$/.test(String(r.cod||'').trim()),vacMotivo:txt((r._doc||{}).vacMotivo)}; });
   RESPS=[...new Set(BASE.map(r=>r.resp).filter(Boolean))].sort(coll.compare);
   $('#segResp').innerHTML='<button type="button" data-resp="">Todos</button>'+RESPS.map(k=>`<button type="button" data-resp="${esc(k)}">${esc(k)}</button>`).join('');
   if(S.resp&&!RESPS.includes(S.resp))S.resp='';
@@ -539,7 +541,7 @@ function cell(r,c,i){
   const cl=i===0?' class="c1"':i===1?' class="c2"':'';
   switch(c.id){
     case 'puestoGE': return `<td${cl} title="${esc(r.puestoGE)}">${val(r.puestoGE)}${rolTag(r)}</td>`;
-    case 'nombre': return `<td${cl} title="${esc(r.nombre)}${r.it?' · de baja por enfermedad (IT) desde '+esc(fmtFecha(r.it.desde)):''}"><span class="nm">${esc(r.nombre)}</span>${r.it?`<span class="tag tag-it">IT ${esc(fmtFecha(r.it.desde))}</span>`:''}${r.plaza?`<span class="tag tag-plaza" title="${esc(r.vacMotivo?'Motivo: '+r.vacMotivo:'Motivo sin indicar')}">Plaza no cubierta</span>`:''}${r.obs?`<span class="tag tag-obs" title="${esc(obsTitle(r))}">${esc(r.obs)}</span>`:''}${editado(r)?'<span class="tag tag-ed" title="Registro editado">✎</span>':''}</td>`;
+    case 'nombre': return `<td${cl} title="${esc(r.nombre)}${r.it?' · '+esc(BAJAS[r.it.motivo][1].toLowerCase())+' desde '+esc(fmtFecha(r.it.desde)):''}"><span class="nm">${esc(r.nombre)}</span>${r.it?`<span class="tag tag-it">${esc(BAJAS[r.it.motivo][0])} ${esc(fmtFecha(r.it.desde))}</span>`:''}${r.plaza?`<span class="tag tag-plaza" title="${esc(r.vacMotivo?'Motivo: '+r.vacMotivo:'Motivo sin indicar')}">Plaza no cubierta</span>`:''}${r.obs?`<span class="tag tag-obs" title="${esc(obsTitle(r))}">${esc(r.obs)}</span>`:''}${editado(r)?'<span class="tag tag-ed" title="Registro editado">✎</span>':''}</td>`;
     case 'comp': { const t=compText(r); return `<td${cl} title="${esc(t)}">${t?esc(t)+(r.motivoEf?'':' <span class="dash">(motivo sin indicar)</span>'):dash}</td>`; }
     case 'cod': return `<td class="cc">${val(r.cod)}</td>`;
     case 'grupo': return `<td><span class="gr">${esc(r.grupo)}</span></td>`;
@@ -704,7 +706,7 @@ function renderDrawer(){
     ${E?`<input type="text" name="nombre" aria-label="Nombre" value="${esc(r.nombre)}">`:`<h2>${esc(r.nombre)} ${rolTag(r)}</h2>`}
     <div class="sub">${esc(r.puestoGE)||''}${r.cod?' · Cód. '+esc(r.cod):''}${E?' · modo edición':''}</div>
     ${r.plaza?`<div class="aviso aviso-plaza">Plaza no cubierta (sin trabajador con código). ${r.vacMotivo?'Motivo: <b>'+esc(r.vacMotivo)+'</b>':'Motivo sin indicar: se indica en la pestaña «Plazas no cubiertas».'}</div>`:''}
-    ${r.it?`<div class="aviso aviso-it">De baja por enfermedad (IT) desde el <b>${esc(fmtFecha(r.it.desde))}</b>${r.it.notas?' · '+esc(r.it.notas):''}. El alta se registra en la pestaña «Altas/Bajas».</div>`:''}
+    ${r.it?`<div class="aviso aviso-it">${esc(BAJAS[r.it.motivo][1])} desde el <b>${esc(fmtFecha(r.it.desde))}</b>${r.it.notas?' · '+esc(r.it.notas):''}. El alta se registra en la pestaña «Altas/Bajas».</div>`:''}
     ${(!E&&ne)?`<div class="aviso">Registro con ${ne} campo${ne>1?'s':''} modificado${ne>1?'s':''} respecto al Excel. <button class="btn sm" type="button" data-restore>Deshacer cambios</button></div>`:''}
   </div>
   <div class="db">
