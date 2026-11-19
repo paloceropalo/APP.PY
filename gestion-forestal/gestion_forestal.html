@@ -651,8 +651,18 @@ let staffDupView=false;
 // Interinos y sustitutos (su Puesto G.E., código y nombre se muestran en azul)
 function isInterinoOSustituto(p){
  if(/^410/.test(String(p?.contract||'').trim())||String(p?.obs||'').trim().toUpperCase()==='INT') return true;
- if(/sustitut/i.test(String(p?.shared||''))||String(p?.cpRol||'')==='sustituto') return true;
+ if(/sustitut/i.test(String(p?.shared||''))||String(p?.cpRol||'')==='sustituto'||String(p?.titular||'').trim()) return true;
  const e=String(p?.emp||'').trim(); return !!e&&itActive().size>0&&[...itActive().values()].some(m=>m.cobertura==='sustituido'&&String(m.sustitutoEmp||'')===e);
+}
+// Titular de la plaza que cubre un interino/a o sustituto/a: primero lo anotado en Altas/Bajas
+// («Sustituido por»), después otra persona de baja en el mismo puesto y, si no, el campo «Titular de la plaza».
+function titularDe(p,act){
+ act=act||itActive();
+ const e=String(p?.emp||'').trim().replace(/^0+/,''), n=normalize(String(p?.name||'')).trim(), pu=String(p?.puesto||'').trim().toUpperCase();
+ const desc=mv=>(mv.name||mv.emp||'')+' ('+BAJA_MOTIVOS[motivoDe(mv)]+' desde '+fmtDMY(mv.fecha)+')';
+ for(const mv of act.values()) if(mv.cobertura==='sustituido'&&((e&&String(mv.sustitutoEmp||'').trim().replace(/^0+/,'')===e)||(n&&normalize(String(mv.sustituto||'')).trim()===n))) return desc(mv);
+ if(pu) for(const o of data.staff){ if(o===p||String(o.puesto||'').trim().toUpperCase()!==pu) continue; const mv=act.get(personKey(o)); if(mv) return desc(mv); }
+ return String(p?.titular||'').trim();
 }
 const isVacant=p=>!/^\d+$/.test(String(p?.emp||'').trim());
 function renderVacs(query,jobs){
@@ -799,7 +809,7 @@ const STAFF_FORM=[['emp','Código de empleado'],['name','Nombre y apellidos'],['
  ['hours','Horas','',true],['contract','Tipo de contrato'],['telework','Teletrabajo'],
  ['prevention','Puesto de prevención','',true],['epi','Tarifa EPI'],['resp','Responsable'],
  ['obs','Obs.','',true],['obsDate','Fecha obs.'],['shared','Puesto compartido'],['sharedReason','Motivo (puesto compartido)'],
- ['vacMotivo','Plaza no cubierta: observaciones (motivo)','long',true]];
+ ['titular','Titular de la plaza (si es interino/a o sustituto/a)','',true],['vacMotivo','Plaza no cubierta: observaciones (motivo)','long',true]];
 // Columnas de la tabla de personal
 const STAFF_TABLE=[['puesto','Puesto G.E.'],['emp','Código'],['name','Nombre'],['role','Puesto de trabajo'],['group','Gr.'],['center','Centro de trabajo'],
  ['hours','Horas'],['contract','Contrato'],['coord','Coordinación'],['obs','Obs.'],['email','Correo'],['mobile','Móvil']];
@@ -898,7 +908,7 @@ function renderStaff(query,jobs){
   tr.onclick=()=>openEditor(p); tr.onkeydown=e=>{if(e.key==='Enter')openEditor(p);};
   if(!staffJob) node('td',(jobs.get(p.job)||{}).code||p.jobKey||'—',tr);
   if(!staffAction) node('td',staffGroup(p)||'—',tr);
-  const sub=isInterinoOSustituto(p); if(sub) tr.title=(/^410/.test(String(p.contract||''))||String(p.obs||'').toUpperCase()==='INT'?'Interino/a':'Sustituto/a')+' · '+tr.title;
+  const sub=isInterinoOSustituto(p); if(sub){ const tit=titularDe(p,act); tr.title=(/^410/.test(String(p.contract||''))||String(p.obs||'').toUpperCase()==='INT'?'Interino/a':'Sustituto/a')+(tit?' de '+tit:' · titular de la plaza sin indicar (añádelo en la ficha, campo «Titular de la plaza»)')+' · '+tr.title; }
   for(const [k] of STAFF_TABLE){ const v=p[k]; const td=node('td',v===undefined||v===null||v===''?'':String(v),tr); if(k==='hours') td.className='num'; if(sub&&(k==='puesto'||k==='emp')) td.classList.add('sub-txt'); if(k==='name'){ td.className='staff-name'+(sub?' sub-txt':''); if(it) node('span',BAJA_ETIQ[motivoDe(it)]+' desde '+fmtDMY(it.fecha),td).className='it-tag'; if(lv) node('span','Plaza vacante',td).className='vac-tag'; if(isVacant(p)){ node('span','Plaza no cubierta',td).className='vac-tag'; if(p.vacMotivo) tr.title='Plaza no cubierta: '+p.vacMotivo; } } }
  }
 }
