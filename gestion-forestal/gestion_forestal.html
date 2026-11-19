@@ -784,6 +784,8 @@ const STAFF_COLS=[['resp','Responsable'],['puesto','Puesto G.E.'],['emp','Códig
  ['epi','Tarifa EPI'],['exp','Expediente'],['jobName','Nombre del encargo'],['jobEnd','Fin del encargo']];
 // Formulario de una adscripción: [campo, etiqueta, tipo, empieza fila]
 // Valores ya existentes en el personal (para los desplegables del formulario)
+// Campos que se eligen de una lista desplegable con los valores ya existentes
+const STAFF_SELECT=['role','degree','coord','center','address','holiday','hours','contract','telework','prevention','epi','resp'];
 const STAFF_SUGGEST=['role','degree','coord','center','address','holiday','hours','contract','telework','prevention','epi','resp','obs','shared','sharedReason'];
 function staffValues(k){ const m=new Map(); for(const p of data.staff){ const v=String(p[k]??'').trim(); if(v&&!m.has(v.toLowerCase())) m.set(v.toLowerCase(),v); } return [...m.values()].sort((a,b)=>a.localeCompare(b,'es',{numeric:true})); }
 // Puestos G.E. vacantes de un encargo y acción: filas sin trabajador con código y excedencias/bajas voluntarias sin sustituto
@@ -983,6 +985,16 @@ function openEditor(item,job,kind,person){
   // Desplegables con los valores existentes (se puede escribir otro)
   for(const k of STAFF_SUGGEST){ const inp=P(k); if(!inp) continue; let dl=byId('dl-staff-'+k); if(!dl){ dl=node('datalist',undefined,document.body); dl.id='dl-staff-'+k; }
    dl.replaceChildren(); for(const v of staffValues(k)) node('option',undefined,dl).value=v; inp.setAttribute('list',dl.id); inp.autocomplete='off'; }
+  // Lista desplegable con los valores existentes; «Otro» permite escribir uno nuevo
+  for(const k of STAFF_SELECT){ const inp=P(k); if(!inp) continue;
+   const cur=String(inp.value||'').trim(), vals=staffValues(k), sel=document.createElement('select'); sel.name=k;
+   node('option','—',sel).value='';
+   for(const v of vals) node('option',v,sel).value=v;
+   if(cur&&!vals.includes(cur)) node('option',cur,sel).value=cur;
+   node('option','✎ Otro (escribir nuevo)…',sel).value='__otro';
+   sel.value=cur;
+   sel.onchange=()=>{ if(sel.value!=='__otro') return; const t=document.createElement('input'); t.type='text'; t.name=k; t.autocomplete='off'; t.placeholder='Escribe el nuevo valor'; sel.replaceWith(t); t.focus(); };
+   inp.replaceWith(sel); }
   { const g=P('group'), sel=document.createElement('select'); sel.name='group'; for(const v of ['','A','B','C','D']) node('option',v||'—',sel).value=v;
     const cur=String(item?.group||'').toUpperCase(); if(cur&&!['A','B','C','D'].includes(cur)) node('option',cur,sel).value=cur; sel.value=cur; g.replaceWith(sel); }
   vacSource=null; vacLeave=null;
@@ -995,7 +1007,7 @@ function openEditor(item,job,kind,person){
     node('option',opts.length?'— Elige un puesto vacante —':'— No hay puestos vacantes en esta acción —',sel).value='';
     opts.forEach((o,i)=>node('option',o.label,sel).value=String(i));
     node('option','Otro: escribir un PUESTO G.E. nuevo',sel).value='__new'; sel.value=''; other.hidden=true; other.required=false; vacSource=null; vacLeave=null; };
-   const prefill=o=>{ for(const k of ['role','group','center','address','holiday','prevention','epi','resp','coord','hours','contract','telework']){ const f=P(k), v=o.src[k]; if(f&&!String(f.value||'').trim()&&v!==undefined&&v!==null&&String(v).trim()) f.value=String(v); } };
+   const prefill=o=>{ for(const k of ['role','group','center','address','holiday','prevention','epi','resp','coord','hours','contract','telework']){ const f=P(k), v=o.src[k]; if(f&&!String(f.value||'').trim()&&v!==undefined&&v!==null&&String(v).trim()){ if(f.tagName==='SELECT'&&![...f.options].some(x=>x.value===String(v))) f.insertBefore(new Option(String(v),String(v)),f.lastChild); f.value=String(v); } } };
    sel.onchange=()=>{ other.hidden=sel.value!=='__new'; other.required=sel.value==='__new'; vacSource=null; vacLeave=null;
     const o=opts[+sel.value]; if(sel.value!==''&&sel.value!=='__new'&&o){ prefill(o); if(o.placeholder) vacSource=o.src; else vacLeave=o.src; } };
    const prevJob=jobSel.onchange; jobSel.onchange=()=>{ prevJob(); fill(); }; actSel.onchange=fill;
