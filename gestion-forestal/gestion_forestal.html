@@ -911,6 +911,8 @@ function renderStaff(query,jobs){
   if(!staffJob) node('td',(jobs.get(p.job)||{}).code||p.jobKey||'—',tr);
   if(!staffAction) node('td',staffGroup(p)||'—',tr);
   const sub=isInterinoOSustituto(p); if(sub){ const tit=titularDe(p,act); tr.title=(/^410/.test(String(p.contract||''))?'Interino/a':'Sustituto/a')+(tit?' de '+tit:' · titular de la plaza sin indicar (añádelo en la ficha, campo «Titular de la plaza»)')+' · '+tr.title; }
+  // Si el aviso ya explica algo (baja, interinidad…), sin el «Abrir la ficha de …» del final
+  if(tr.title.includes(' · Abrir la ficha de ')) tr.title=tr.title.slice(0,tr.title.indexOf(' · Abrir la ficha de '));
   for(const [k] of STAFF_TABLE){ const v=p[k]; const td=node('td',v===undefined||v===null||v===''?'':String(v),tr); if(k==='hours') td.className='num'; if(sub&&(k==='puesto'||k==='emp')) td.classList.add('sub-txt'); if(k==='name'){ td.className='staff-name'+(sub?' sub-txt':''); if(it) node('span',BAJA_ETIQ[motivoDe(it)]+' desde '+fmtDMY(it.fecha),td).className='it-tag'; if(lv) node('span','Plaza vacante',td).className='vac-tag'; if(isVacant(p)){ node('span','Plaza no cubierta',td).className='vac-tag'; if(p.vacMotivo) tr.title='Plaza no cubierta: '+p.vacMotivo; } } }
  }
 }
