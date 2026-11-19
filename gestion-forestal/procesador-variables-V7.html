@@ -1,0 +1,2707 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Procesador de Variables Laborales</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+
+<!-- Firebase App SDK & Firestore -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e1117;
+    --surface: #161b26;
+    --surface2: #1e2536;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.15);
+    --accent: #3b82f6;
+    --accent2: #60a5fa;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --text: #f1f5f9;
+    --text2: #94a3b8;
+    --text3: #64748b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Sora', sans-serif;
+    --radius: 10px;
+    --radius-lg: 16px;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  .header {
+    border-bottom: 1px solid var(--border);
+    padding: 1.25rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-icon {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: #fff;
+  }
+  .header h1 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .header p { font-size: 12px; color: var(--text3); font-family: var(--mono); }
+  .header-badge {
+    margin-left: auto;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--accent2);
+    background: rgba(59,130,246,0.12);
+    border: 1px solid rgba(59,130,246,0.25);
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+
+  .tab-bar {
+    display: flex;
+    gap: 4px;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0.75rem 2rem 0;
+  }
+  .tab-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    color: var(--text3);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+  }
+  .tab-btn:hover { color: var(--text2); }
+  .tab-btn.active {
+    color: var(--text);
+    background: var(--surface);
+    border-color: var(--border2);
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .main-mantenimiento {
+    grid-template-columns: 1fr;
+    max-width: 760px;
+    gap: 1.5rem;
+  }
+  .maint-desc { font-size: 12.5px; color: var(--text2); line-height: 1.6; margin-bottom: 1rem; }
+  .maint-hint { font-size: 11px; color: var(--text3); margin-bottom: 6px; }
+  .maint-textarea {
+    resize: vertical;
+    font-family: var(--mono);
+    line-height: 1.5;
+  }
+
+  .main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2.5rem 2rem;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    position: sticky;
+    top: 80px;
+  }
+  .panel-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-body { padding: 1.25rem; }
+
+  .drop-zone {
+    border: 2px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 2.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(59,130,246,0.05);
+  }
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .drop-icon { font-size: 32px; color: var(--text3); margin-bottom: 0.75rem; display: block; }
+  .drop-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+  .drop-sub { font-size: 12px; color: var(--text3); }
+
+  .file-list { margin-top: 1rem; display: flex; flex-direction: column; gap: 6px; }
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--surface2);
+    border-radius: 8px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+  }
+  .file-item i { color: var(--accent2); flex-shrink: 0; }
+  .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
+  .file-remove {
+    color: var(--text3); cursor: pointer; flex-shrink: 0;
+    border: none; background: none; padding: 2px; border-radius: 4px;
+    transition: color 0.15s;
+  }
+  .file-remove:hover { color: var(--danger); }
+
+  .cache-status {
+    margin-top: 1rem;
+    padding: 10px;
+    background: var(--surface2);
+    border-radius: 8px;
+    font-size: 11px;
+    color: var(--text3);
+    line-height: 1.5;
+    border: 1px solid var(--border);
+  }
+
+  .field-group { margin-top: 1rem; }
+  .field-label { font-size: 12px; color: var(--text3); margin-bottom: 6px; display: block; }
+  .field-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .field-input:focus { border-color: var(--accent); }
+
+  .btn-process {
+    margin-top: 1.25rem;
+    width: 100%;
+    padding: 11px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: opacity 0.2s;
+  }
+  .btn-process:hover { opacity: 0.9; }
+  .btn-process:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 1.5rem;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+  }
+  .stat-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 24px; font-weight: 600; font-family: var(--mono); }
+  .stat-value.blue { color: var(--accent2); }
+  .stat-value.green { color: var(--success); }
+  .stat-value.amber { color: var(--warning); }
+  .stat-value.purple { color: #a78bfa; }
+
+  .results-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .results-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .results-title { font-size: 14px; font-weight: 600; }
+  .results-count {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--accent2);
+    background: rgba(59,130,246,0.12);
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+  .btn-download {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    background: rgba(34,197,94,0.15);
+    color: var(--success);
+    border: 1px solid rgba(34,197,94,0.3);
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn-download:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; background: var(--surface); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text2); white-space: nowrap; }
+  td.mono { font-family: var(--mono); font-size: 12px; }
+  td.highlight { color: var(--text); font-weight: 500; }
+  .badge-encargo { font-size: 11px; font-family: var(--mono); background: rgba(59,130,246,0.12); color: var(--accent2); padding: 2px 8px; border-radius: 4px; }
+  .num-positive { color: var(--success); font-family: var(--mono); }
+  .num-zero { color: var(--text3); font-family: var(--mono); }
+
+  .empty-state { padding: 4rem 2rem; text-align: center; color: var(--text3); }
+  .empty-state i { font-size: 40px; margin-bottom: 1rem; display: block; opacity: 0.4; }
+
+  .revision-turnicidad {
+    margin: 1rem 1.25rem 0;
+    padding: 1rem 1.25rem;
+    border: 1px solid rgba(245,158,11,0.35);
+    background: rgba(245,158,11,0.06);
+    border-radius: 10px;
+  }
+  .revision-turnicidad h4 {
+    margin: 0 0 4px; font-size: 13px; color: var(--warning);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .revision-turnicidad p { margin: 0 0 10px; font-size: 12px; color: var(--text3); }
+  .revision-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 0; border-top: 1px solid rgba(245,158,11,0.2);
+  }
+  .revision-item:first-of-type { border-top: none; }
+  .revision-item input[type="checkbox"] { margin-top: 3px; cursor: pointer; }
+  .revision-item .revision-nombre { font-weight: 500; color: var(--text); font-size: 13px; }
+  .revision-item .revision-detalle { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .revision-item label { cursor: pointer; flex: 1; }
+  .btn-expandir-jornadas {
+    margin-top: 6px; background: none; border: none; padding: 0;
+    color: var(--accent2); font-size: 11.5px; font-family: var(--sans);
+    cursor: pointer; display: flex; align-items: center; gap: 4px;
+  }
+  .btn-expandir-jornadas:hover { color: var(--accent); text-decoration: underline; }
+  .revision-jornadas { margin: 8px 0 4px; overflow-x: auto; }
+  .mini-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  .mini-table th { text-align: left; padding: 4px 10px; color: var(--text3); font-weight: 600; background: rgba(255,255,255,0.03); }
+  .mini-table td { padding: 4px 10px; border-top: 1px solid rgba(255,255,255,0.06); color: var(--text2); white-space: nowrap; }
+
+  .main-contratos { grid-template-columns: 1fr 1fr; max-width: 1100px; }
+  .contrato-add { display: flex; gap: 8px; margin: 1rem 0; }
+  .contrato-add input { min-width: 0; }
+  .contrato-add .cod { flex: 0 0 110px; }
+  .contrato-add .nom { flex: 1; }
+  .btn-add-contrato {
+    padding: 0 14px; background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .btn-add-contrato:hover { opacity: 0.9; }
+  .contrato-tabla { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .contrato-tabla th { padding: 6px 10px; text-align: left; font-size: 11px; color: var(--text3); text-transform: uppercase; }
+  .contrato-tabla td { padding: 6px 10px; border-top: 1px solid var(--border); color: var(--text2); }
+  .contrato-tabla td.cod { font-family: var(--mono); font-size: 12px; color: var(--accent2); width: 90px; }
+  .contrato-tabla td.nom { color: var(--text); }
+  .contrato-tabla td.acc { width: 36px; text-align: right; }
+  .btn-quitar-contrato { background: none; border: none; color: var(--text3); cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+  .btn-quitar-contrato:hover { color: var(--danger); }
+  .btn-restaurar { margin-top: 12px; background: none; border: 1px solid var(--border2); color: var(--text3); border-radius: 8px; padding: 6px 12px; font-family: var(--sans); font-size: 12px; cursor: pointer; }
+  .btn-restaurar:hover { color: var(--text); }
+  .check-row { display: flex; align-items: flex-start; gap: 8px; margin-top: 1rem; font-size: 12px; color: var(--text2); cursor: pointer; }
+  .check-row input { margin-top: 3px; cursor: pointer; }
+  @media (max-width: 900px) { .main-contratos { grid-template-columns: 1fr; } }
+
+  .log-area {
+    margin-top: 1rem; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.75rem 1rem; max-height: 130px; overflow-y: auto;
+    font-family: var(--mono); font-size: 11px; display: none;
+  }
+  .log-area.visible { display: block; }
+  .log-line { margin-bottom: 3px; }
+  .log-line.ok { color: var(--success); }
+  .log-line.err { color: var(--danger); }
+  .log-line.info { color: var(--text3); }
+  .log-line.warn { color: var(--warning); }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-icon"><i class="ti ti-table-filled"></i></div>
+  <div>
+    <h1>Procesador de Variables Laborales</h1>
+    <p>Conexión Cloud Firestore · Festivos Autonómicos/Locales · Horas Extras · Nocturnidad</p>
+  </div>
+  <span class="header-badge">v8.0 · Complementos por contrato</span>
+</header>
+
+<div class="tab-bar">
+  <button class="tab-btn active" id="tabBtnProcesar" onclick="cambiarPestana('procesar')">
+    <i class="ti ti-play" aria-hidden="true"></i> Procesar
+  </button>
+  <button class="tab-btn" id="tabBtnMantenimiento" onclick="cambiarPestana('mantenimiento')">
+    <i class="ti ti-tools" aria-hidden="true"></i> Mantenimiento
+  </button>
+  <button class="tab-btn" id="tabBtnLaboral" onclick="cambiarPestana('laboral')">
+    <i class="ti ti-report-money" aria-hidden="true"></i> Laboral
+  </button>
+  <button class="tab-btn" id="tabBtnContratos" onclick="cambiarPestana('contratos')">
+    <i class="ti ti-file-certificate" aria-hidden="true"></i> Contratos
+  </button>
+</div>
+
+<div class="tab-content active" id="tabProcesar">
+<main class="main">
+
+  <aside class="panel">
+    <div class="panel-header">
+      <i class="ti ti-settings-2"></i> Configuración
+    </div>
+    <div class="panel-body">
+      
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept=".xlsx" multiple>
+        <span class="drop-icon"><i class="ti ti-cloud-upload"></i></span>
+        <p class="drop-title">Subir Listado de Variables (.xlsx)</p>
+        <p class="drop-sub">Arrastra o haz clic para seleccionar</p>
+      </div>
+
+      <div class="file-list" id="fileList"></div>
+
+      <div class="cache-status" id="estadoFirestore">
+        <i class="ti ti-cloud-download"></i> Conectando con Firestore...
+      </div>
+
+      <div class="cache-status" id="estadoFestivos">
+        <i class="ti ti-calendar"></i> Cargando calendario oficial de festivos...
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="outputName">Nombre del archivo de salida</label>
+        <input class="field-input" type="text" id="outputName" placeholder="variables_final_laboral.xlsx">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="metodoNocturnidad">Cálculo del plus de nocturnidad</label>
+        <select class="field-input" id="metodoNocturnidad">
+          <option value="proporcional" selected>Convenio — 1 unidad si ≥ 210 min (½ de 7 h); si no, proporcional</option>
+          <option value="cuidadores">CÁLCULO NOCTURNIDAD CUIDADORES DE FAUNA — 1 unidad por cada entrada a las 00:00</option>
+        </select>
+      </div>
+
+      <button class="btn-process" id="btnProcess" disabled onclick="procesarArchivos()">
+        <i class="ti ti-play"></i> Procesar variables
+      </button>
+
+      <div class="log-area" id="logArea"></div>
+    </div>
+  </aside>
+
+  <section>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Trabajadores</div>
+        <div class="stat-value blue" id="statTrabajadores">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Festivos</div>
+        <div class="stat-value green" id="statFestivos">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total HH.EE.</div>
+        <div class="stat-value amber" id="statHE">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Nocturnidades</div>
+        <div class="stat-value purple" id="statNocturn">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Festivos Auto</div>
+        <div class="stat-value blue" id="statFestivosAuto">—</div>
+      </div>
+    </div>
+
+    <div class="results-panel">
+      <div class="results-header">
+        <i class="ti ti-list-details"></i>
+        <span class="results-title">Resultados</span>
+        <span class="results-count" id="resultsCount" style="display:none"></span>
+        <button class="btn-download" id="btnDownload" disabled onclick="descargarExcel()">
+          <i class="ti ti-download"></i> Descargar xlsx
+        </button>
+      </div>
+
+      <div id="revisionTurnicidad" style="display:none;"></div>
+
+      <div id="tableContainer">
+        <div class="empty-state">
+          <i class="ti ti-table-off"></i>
+          <p>Sube el listado de variables y pulsa <strong>Procesar</strong> para ver los resultados.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</div>
+
+<div class="tab-content" id="tabMantenimiento">
+<main class="main main-mantenimiento">
+
+  <section class="panel">
+    <div class="panel-header">
+      <i class="ti ti-shield-half" aria-hidden="true"></i> Datos Personal (respaldo local)
+    </div>
+    <div class="panel-body">
+      <p class="maint-desc">
+        Firestore es la fuente principal de localidades. Si sube aquí un Excel de Datos Personal
+        (columnas <strong>COD.</strong> y <strong>FESTIVO LOCAL</strong>), solo se usa para tapar los
+        códigos que Firestore no resuelva. No se sube ni se guarda nada en la nube: se queda en la
+        memoria de este navegador mientras la pestaña esté abierta.
+      </p>
+      <div class="drop-zone" id="dropZoneRespaldo">
+        <input type="file" id="fileInputRespaldo" accept=".xlsx" multiple>
+        <span class="drop-icon"><i class="ti ti-cloud-upload" aria-hidden="true"></i></span>
+        <p class="drop-title">Arrastra DATOS_PERSONAL.xlsx</p>
+        <p class="drop-sub">Columnas COD. y FESTIVO LOCAL</p>
+      </div>
+      <div class="file-list" id="fileListRespaldo"></div>
+      <div class="cache-status" id="estadoRespaldo" style="display:none;"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <i class="ti ti-calendar-plus" aria-hidden="true"></i> Festivos 2027
+    </div>
+    <div class="panel-body">
+      <p class="maint-desc">
+        Configura aquí el calendario de 2027 en cuanto se publique. Se guarda en este navegador
+        (no en Firestore) y sustituye a lo que ya viniera cargado por defecto en la app.
+      </p>
+
+      <div class="field-group">
+        <label class="field-label">Festivos nacionales/autonómicos 2027</label>
+        <p class="maint-hint">Una fecha por línea, formato DD/MM (p. ej. 01/01).</p>
+        <textarea class="field-input maint-textarea" id="textNacional2027" rows="6"></textarea>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Festivos locales 2027</label>
+        <p class="maint-hint">Una localidad por línea: LOCALIDAD; DD/MM; DD/MM (p. ej. BADAJOZ; 17/02; 24/06).</p>
+        <textarea class="field-input maint-textarea" id="textLocales2027" rows="10"></textarea>
+      </div>
+
+      <button class="btn-process" id="btnGuardarFestivos2027" onclick="guardarFestivos2027()">
+        <i class="ti ti-device-floppy" aria-hidden="true"></i> Guardar configuración 2027
+      </button>
+
+      <div class="cache-status" id="estadoFestivos2027" style="display:none;"></div>
+    </div>
+  </section>
+
+</main>
+</div>
+
+<div class="tab-content" id="tabLaboral">
+<main class="main">
+
+  <aside class="panel">
+    <div class="panel-header">
+      <i class="ti ti-settings-2"></i> Informe para Laboral
+    </div>
+    <div class="panel-body">
+
+      <div class="drop-zone" id="dropZoneLaboral">
+        <input type="file" id="fileInputLaboral" accept=".xlsx" multiple>
+        <span class="drop-icon"><i class="ti ti-cloud-upload"></i></span>
+        <p class="drop-title">Sube los Variables_*.xlsx generados</p>
+        <p class="drop-sub">Uno o varios encargos del mismo mes</p>
+      </div>
+
+      <div class="file-list" id="fileListLaboral"></div>
+
+      <div class="field-group">
+        <label class="field-label" for="laboralAnio">Año</label>
+        <input class="field-input" type="number" id="laboralAnio" placeholder="2026">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="laboralMes">Mes</label>
+        <select class="field-input" id="laboralMes">
+          <option value="">—</option>
+          <option>ENERO</option><option>FEBRERO</option><option>MARZO</option>
+          <option>ABRIL</option><option>MAYO</option><option>JUNIO</option>
+          <option>JULIO</option><option>AGOSTO</option><option>SEPTIEMBRE</option>
+          <option>OCTUBRE</option><option>NOVIEMBRE</option><option>DICIEMBRE</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="laboralArea">Área</label>
+        <select class="field-input" id="laboralArea" onchange="cambiarAreaGlobalLaboral()">
+          <option value="AREA DE TRABAJOS EN EL MEDIO NATURAL|TMN">Trabajos en el Medio Natural (TMN)</option>
+          <option value="AREA DE CONSULTORIA EN GESTION, PROMOCION Y DESARROLLO|GPD">Consultoría, Gestión, Promoción y Desarrollo (GPD)</option>
+          <option value="AREA DE TICS|TIC">TICs (TIC)</option>
+          <option value="SERVICIOS CORPORATIVOS|SC">Servicios Corporativos (SC)</option>
+        </select>
+      </div>
+
+      <label class="check-row">
+        <input type="checkbox" id="laboralIncluirContrato" checked>
+        <span>Incluir también a los trabajadores con complementos por contrato (pestaña Contratos) aunque no aparezcan en los archivos cargados</span>
+      </label>
+
+      <button class="btn-process" id="btnCargarLaboral" disabled onclick="cargarVariablesLaboral()">
+        <i class="ti ti-refresh"></i> Cargar / recalcular variables
+      </button>
+
+      <div class="field-group">
+        <label class="field-label" for="outputNameLaboral">Nombre del archivo de salida</label>
+        <input class="field-input" type="text" id="outputNameLaboral" placeholder="VARIABLES_LABORAL.xlsx">
+      </div>
+
+      <div class="log-area" id="logAreaLaboral"></div>
+    </div>
+  </aside>
+
+  <section>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Trabajadores</div>
+        <div class="stat-value blue" id="statTrabajadoresLaboral">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Archivos cargados</div>
+        <div class="stat-value amber" id="statArchivosLaboral">—</div>
+      </div>
+    </div>
+
+    <div class="results-panel">
+      <div class="results-header">
+        <i class="ti ti-list-details"></i>
+        <span class="results-title">Informe para Laboral</span>
+        <button class="btn-download" id="btnDownloadLaboral" disabled onclick="descargarInformeLaboral()">
+          <i class="ti ti-download"></i> Descargar xlsx
+        </button>
+      </div>
+
+      <p class="maint-desc" style="padding: 0 20px; margin-top:12px;">
+        El Excel generado reproduce el formato del modelo (colores, tarifas, bordes y anchos de columna).
+        Se calculan automáticamente el festivo, la nocturnidad y las horas extra por trabajador —
+        sumando si aparece en varios encargos del mismo mes. El resto de columnas (turnicidad,
+        peligrosidad, guardias, dietas, kilometraje, trabajador nuevo, observaciones...) salen en
+        blanco para rellenarlas directamente en el propio Excel, igual que hasta ahora.
+      </p>
+
+      <div id="tableContainerLaboral" class="empty-state">
+        <i class="ti ti-table-off"></i>
+        <p>Sube los Variables_*.xlsx del mes y pulsa <strong>Cargar / recalcular variables</strong>.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+</div>
+
+<div class="tab-content" id="tabContratos">
+<main class="main main-contratos">
+
+  <section class="panel" style="position: static;">
+    <div class="panel-header">
+      <i class="ti ti-alert-triangle" aria-hidden="true"></i> Peligrosidad/toxicidad por contrato
+    </div>
+    <div class="panel-body">
+      <p class="maint-desc">
+        Estos trabajadores cobran <strong>1 unidad</strong> de peligrosidad/toxicidad cada mes por contrato.
+        Se añade automáticamente en la pestaña Laboral, aunque no venga en los listados importados.
+      </p>
+      <div class="contrato-add">
+        <input class="field-input cod" type="text" id="addCodPeligrosidad" placeholder="Código" onkeydown="if(event.key==='Enter') agregarContrato('peligrosidad')">
+        <input class="field-input nom" type="text" id="addNomPeligrosidad" placeholder="Nombre del trabajador" onkeydown="if(event.key==='Enter') agregarContrato('peligrosidad')">
+        <button class="btn-add-contrato" onclick="agregarContrato('peligrosidad')"><i class="ti ti-plus" aria-hidden="true"></i> Añadir</button>
+      </div>
+      <div id="listaPeligrosidad"></div>
+    </div>
+  </section>
+
+  <section class="panel" style="position: static;">
+    <div class="panel-header">
+      <i class="ti ti-repeat" aria-hidden="true"></i> Plus turnicidad por contrato
+    </div>
+    <div class="panel-body">
+      <p class="maint-desc">
+        Estos trabajadores cobran <strong>1 unidad</strong> de turnicidad cada mes, hagan o no cambios de turno,
+        por lo que quedan excluidos de la revisión de turnicidad en la pestaña Procesar.
+      </p>
+      <div class="contrato-add">
+        <input class="field-input cod" type="text" id="addCodTurnicidad" placeholder="Código" onkeydown="if(event.key==='Enter') agregarContrato('turnicidad')">
+        <input class="field-input nom" type="text" id="addNomTurnicidad" placeholder="Nombre del trabajador" onkeydown="if(event.key==='Enter') agregarContrato('turnicidad')">
+        <button class="btn-add-contrato" onclick="agregarContrato('turnicidad')"><i class="ti ti-plus" aria-hidden="true"></i> Añadir</button>
+      </div>
+      <div id="listaTurnicidad"></div>
+    </div>
+  </section>
+
+  <section style="grid-column: 1 / -1;">
+    <div class="cache-status" id="estadoContratos">
+      <span id="estadoContratosTexto">Los cambios se guardan en la base de datos compartida (los ve todo el equipo).</span>
+      <button class="btn-restaurar" onclick="restaurarContratos()"><i class="ti ti-restore" aria-hidden="true"></i> Restaurar listas iniciales</button>
+    </div>
+  </section>
+
+</main>
+</div>
+
+<script>
+// --- CONFIGURACIÓN FIREBASE PROYECTO CÁLCULO DE VARIABLES ---
+const firebaseConfig = {
+  apiKey: "AIzaSyDJ9r7ZFPyK1ZjRINLDtGS7twBteRZR2ic",
+  authDomain: "calculo-de-variables.firebaseapp.com",
+  projectId: "calculo-de-variables",
+  storageBucket: "calculo-de-variables.firebasestorage.app",
+  messagingSenderId: "292419742817",
+  appId: "1:292419742817:web:8dce0c25431cacfc784e20"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+// Autenticación anónima: no pide credenciales ni pantalla de login a quien
+// abra el archivo, pero exige a las reglas de Firestore comprobar
+// "request.auth != null" en vez de dejar la base de datos abierta a
+// cualquiera que copie la configuración del HTML.
+auth.signInAnonymously().catch(err => {
+  console.error('Error de autenticación anónima con Firebase:', err);
+  const statusEl = document.getElementById('estadoFirestore');
+  if (statusEl) {
+    statusEl.style.borderColor = 'rgba(239,68,68,0.3)';
+    statusEl.innerHTML = `<i class="ti ti-alert-triangle" style="color: var(--danger)"></i> No se pudo autenticar con Firebase. Revisa que la autenticación anónima esté activada en el proyecto.`;
+  }
+});
+
+let archivosSeleccionados = [];
+let archivosRespaldo = [];
+let datosFinales = [];
+let datosFinalesDiarios = [];
+let detalleTurnicidad = {}; // 'encargo||codigo' -> texto explicando qué días detectaron el turno
+let candidatosTurnicidad = []; // { filaIdx, encargo, codigo, nombre, detalle, confirmado } a revisar antes de exportar
+let mapaCodigoLocalidad = {};        // desde Firestore (fuente principal)
+let mapaCodigoLocalidadRespaldo = {}; // desde el Excel local, solo para huecos de Firestore
+let localidadesNoReconocidas = new Set();
+let codigosSinLocalidad = new Set();
+let codigosResueltosPorRespaldo = new Set();
+
+// --- MÓDULO "LABORAL": consolidación de Variables_*.xlsx en el formato de envío ---
+let archivosLaboral = [];
+let filasLaboral = []; // una fila por código de trabajador, con campos auto + manuales
+
+// --- CALENDARIO FESTIVOS NACIONALES Y AUTONÓMICOS EXTREMADURA ---
+let FESTIVOS_EXTREMADURA_2026 = [
+  '01-01', '01-06', '04-02', '04-03', '05-01', '08-15', '09-08', '10-12', '11-02', '12-07', '12-08', '12-25'
+];
+
+let FESTIVOS_EXTREMADURA_2027 = [
+  '01-01', '01-06', '03-25', '03-26', '05-01', '08-15', '09-08', '10-12', '11-01', '12-06', '12-08', '12-25'
+];
+
+// --- FESTIVOS LOCALES POR MUNICIPIO ---
+// Respaldo incrustado. Al arrancar, la app carga el calendario oficial
+// completo desde festivos_extremadura_2026.json (misma carpeta del hosting)
+// y lo combina con esta tabla. Las entradas de aquí que no estén en el
+// calendario oficial (p. ej. pedanías como Villarreal de San Carlos) se
+// conservan.
+let FESTIVOS_LOCALES_2026 = {
+  'BADAJOZ': ['02-17', '06-24'],
+  'MERIDA': ['05-21', '12-10'],
+  'NAVALVILLAR DE PELA': ['01-19', '04-06'],
+  'FUENTE DEL ARCO': ['06-01', '09-09'],
+  'TRUJILLANOS': ['02-17', '06-01'],
+  'CACERES': ['04-23', '05-29'],
+  'ALCANTARA': ['04-10', '10-19'],
+  'CASTANAR DE IBOR': ['04-06', '07-10'],
+  'CUACOS DE YUSTE': ['04-13', '09-14'],
+  'JERTE': ['02-02', '07-16'],
+  'MALPARTIDA DE CACERES': ['02-17', '05-18'],
+  'MALPARTIDA DE PLASENCIA': ['04-20', '07-03'],
+  'SIERRA DE FUENTES': ['05-15', '09-14'],
+  'VILLARREAL DE SAN CARLOS': ['04-06', '09-29']
+};
+
+let FESTIVOS_LOCALES_2027 = {
+  'BADAJOZ': ['02-09', '06-24'],
+  'MERIDA': ['05-21', '12-10']
+};
+
+function normalizarTexto(str) {
+  if (!str) return '';
+  return String(str)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
+function normalizarCodigo(cod) {
+  if (cod === null || cod === undefined) return '';
+  return String(cod).trim().replace(/^0+(?=\d)/, '');
+}
+
+function esFestivoNacionalRegional(dia) {
+  if (!dia) return false;
+  const anio = dia.getFullYear();
+  const mmdd = String(dia.getMonth() + 1).padStart(2, '0') + '-' + String(dia.getDate()).padStart(2, '0');
+  
+  if (anio === 2026) return FESTIVOS_EXTREMADURA_2026.includes(mmdd);
+  if (anio === 2027) return FESTIVOS_EXTREMADURA_2027.includes(mmdd);
+  return false;
+}
+
+/**
+ * Clave de comparación de localidades: sin tildes, sin mayúsculas, sin
+ * signos y con el artículo quitado esté delante o entre paréntesis, para
+ * que "LA ALBUERA", "Albuera (La)" y "ALBUERA" sean la misma localidad.
+ */
+function claveLocalidad(str) {
+  let t = normalizarTexto(str)
+    .replace(/[^A-Z0-9()Ñ ]/g, ' ')
+    .replace(/\((LA|EL|LOS|LAS)\)/g, ' ')
+    .replace(/[()]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+  t = t.replace(/^(LA|EL|LOS|LAS) /, '');
+  return t;
+}
+
+const __indicesLocalidades = new WeakMap();
+function buscarFechasLocalidad(mapa, localidad) {
+  if (!mapa) return null;
+  if (mapa[localidad]) return mapa[localidad];
+  let indice = __indicesLocalidades.get(mapa);
+  if (!indice) {
+    indice = {};
+    for (const [nombre, fechas] of Object.entries(mapa)) indice[claveLocalidad(nombre)] = fechas;
+    __indicesLocalidades.set(mapa, indice);
+  }
+  return indice[claveLocalidad(localidad)] || null;
+}
+
+function esFestivoLocal(dia, codigo) {
+  if (!dia) return false;
+  const anio = dia.getFullYear();
+  const cod = normalizarCodigo(codigo);
+  let localidad = mapaCodigoLocalidad[cod];
+  if (!localidad && mapaCodigoLocalidadRespaldo[cod]) {
+    localidad = mapaCodigoLocalidadRespaldo[cod];
+    codigosResueltosPorRespaldo.add(String(codigo));
+  }
+  if (!localidad) { codigosSinLocalidad.add(String(codigo)); return false; }
+
+  const mapaFestivos = anio === 2027 ? FESTIVOS_LOCALES_2027 : FESTIVOS_LOCALES_2026;
+  const fechas = buscarFechasLocalidad(mapaFestivos, localidad);
+  if (!fechas) { localidadesNoReconocidas.add(localidad); return false; }
+
+  const mmdd = String(dia.getMonth() + 1).padStart(2, '0') + '-' + String(dia.getDate()).padStart(2, '0');
+  return fechas.includes(mmdd);
+}
+
+/**
+ * Busca un valor dentro de un documento de Firestore, probando primero
+ * claves EXACTAS (tras normalizar) y solo si no hay ninguna cayendo a
+ * una coincidencia por subcadena. Esto evita que un campo como
+ * "NOMBRE_TRABAJADOR" (contiene "TRABAJADOR") se cuele como si fuera el
+ * código del trabajador cuando se busca por ['CODIGO','COD','TRABAJADOR'].
+ * Los campos con nombre coincidente pero valor vacío ('', null, undefined)
+ * se ignoran y se sigue buscando, en vez de aceptarlos como si fueran el
+ * dato real: algunos documentos tienen campos placeholder vacíos con
+ * nombres ambiguos (p.ej. 'codTrabajador') que, de aceptarse, bloquean la
+ * búsqueda antes de llegar al campo correcto en otra parte del documento.
+ */
+function esValorUtil(v) {
+  return v !== null && v !== undefined && String(v).trim() !== '';
+}
+
+function buscarPropiedad(obj, clavesExactas, clavesParciales = clavesExactas) {
+  if (!obj || typeof obj !== 'object') return null;
+
+  // 1ª pasada: coincidencia exacta de nombre de campo (a cualquier nivel).
+  for (let key of Object.keys(obj)) {
+    const keyNorm = normalizarTexto(key);
+    if (clavesExactas.includes(keyNorm) && typeof obj[key] !== 'object' && esValorUtil(obj[key])) return obj[key];
+  }
+  for (let key of Object.keys(obj)) {
+    if (typeof obj[key] === 'object' && obj[key] !== null) {
+      const sub = buscarPropiedad(obj[key], clavesExactas, clavesParciales);
+      if (sub !== null) return sub;
+    }
+  }
+
+  // 2ª pasada (más laxa): coincidencia por subcadena, solo si la exacta falló.
+  for (let key of Object.keys(obj)) {
+    const keyNorm = normalizarTexto(key);
+    if (clavesParciales.some(c => keyNorm.includes(c)) && typeof obj[key] !== 'object' && esValorUtil(obj[key])) return obj[key];
+  }
+  for (let key of Object.keys(obj)) {
+    if (typeof obj[key] === 'object' && obj[key] !== null) {
+      const sub = buscarPropiedad(obj[key], [], clavesParciales);
+      if (sub !== null) return sub;
+    }
+  }
+  return null;
+}
+
+let firestoreListo = false; // true cuando mapaCodigoLocalidad ya está construido desde Firestore
+let festivosListo = false;  // true cuando se ha intentado cargar el calendario oficial (JSON)
+
+/**
+ * Descarga festivos_extremadura_<año>.json desde la misma carpeta del
+ * hosting y devuelve { nacionales: ['MM-DD'...], locales: {LOCALIDAD: ['MM-DD'...]} }
+ * o null si el archivo no existe o no se puede leer.
+ */
+async function descargarCalendarioOficial(anio) {
+  try {
+    const resp = await fetch(`festivos_extremadura_${anio}.json`, { cache: 'no-cache' });
+    if (!resp.ok) return null;
+    const datos = await resp.json();
+    const aMMDD = f => String(f).slice(5, 10);
+    const nacionales = Array.isArray(datos.nacionales_regionales) ? datos.nacionales_regionales.map(aMMDD) : [];
+    const locales = {};
+    for (const [nombre, info] of Object.entries(datos.locales || {})) {
+      const fechas = (info.fechas || []).map(aMMDD);
+      if (fechas.length) locales[normalizarTexto(nombre)] = fechas;
+    }
+    return { nacionales, locales, fuente: datos.fuente || '' };
+  } catch (err) {
+    console.warn(`No se pudo cargar festivos_extremadura_${anio}.json:`, err);
+    return null;
+  }
+}
+
+async function cargarFestivosOficiales() {
+  const el = document.getElementById('estadoFestivos');
+  try {
+    const cal2026 = await descargarCalendarioOficial(2026);
+    if (cal2026) {
+      if (cal2026.nacionales.length) FESTIVOS_EXTREMADURA_2026 = cal2026.nacionales;
+      FESTIVOS_LOCALES_2026 = { ...FESTIVOS_LOCALES_2026, ...cal2026.locales };
+      el.style.borderColor = 'rgba(34,197,94,0.3)';
+      el.innerHTML = `<i class="ti ti-circle-check" style="color: var(--success)"></i> Calendario oficial 2026 cargado: ${FESTIVOS_EXTREMADURA_2026.length} festivos nacionales/regionales y ${Object.keys(cal2026.locales).length} localidades.`;
+      el.title = cal2026.fuente;
+    } else {
+      el.style.borderColor = 'rgba(245,158,11,0.3)';
+      el.innerHTML = `<i class="ti ti-alert-triangle" style="color: var(--warning)"></i> No se encontró festivos_extremadura_2026.json: se usa la lista reducida incluida en la app (${Object.keys(FESTIVOS_LOCALES_2026).length} localidades).`;
+    }
+
+    // 2027: si existe el JSON oficial y no hay festivos guardados a mano
+    // en este navegador (sección "Festivos 2027"), se usa el oficial.
+    const cal2027 = await descargarCalendarioOficial(2027);
+    let guardado2027 = null;
+    try { guardado2027 = localStorage.getItem(LOCALSTORAGE_KEY_FESTIVOS_2027); } catch (e) {}
+    if (cal2027 && !guardado2027) {
+      if (cal2027.nacionales.length) FESTIVOS_EXTREMADURA_2027 = cal2027.nacionales;
+      FESTIVOS_LOCALES_2027 = { ...FESTIVOS_LOCALES_2027, ...cal2027.locales };
+      renderizarFestivos2027EnFormulario();
+      el.innerHTML += ` · 2027 también cargado (${Object.keys(cal2027.locales).length} localidades).`;
+    }
+  } finally {
+    festivosListo = true;
+    if (typeof actualizarEstadoBotonProcesar === 'function') actualizarEstadoBotonProcesar();
+  }
+}
+
+async function cargarPersonalFirestore() {
+  const statusEl = document.getElementById('estadoFirestore');
+  try {
+    const snapshot = await db.collection('puestos').get();
+    let count = 0;
+    const docsProblematicos = [];
+    let ultimaActualizacion = null; // Timestamp más reciente visto en el campo updatedAt de los documentos
+    window.__firestorePuestosRaw = []; // para poder inspeccionar en consola
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      window.__firestorePuestosRaw.push({ id: doc.id, ...data });
+
+      // subir_datos.py fija 'updatedAt' (SERVER_TIMESTAMP) en cada
+      // ejecución para todos los puestos que procesa, así que basta con
+      // quedarse con el más reciente visto en toda la colección para saber
+      // cuándo se ejecutó por última vez el script de carga.
+      if (data?.updatedAt && typeof data.updatedAt.toDate === 'function') {
+        const fecha = data.updatedAt.toDate();
+        if (!ultimaActualizacion || fecha > ultimaActualizacion) ultimaActualizacion = fecha;
+      }
+
+      // Lectura por ruta exacta (esquema real de 'puestos', ver
+      // subir_datos.py): centroTrabajo.festivoLocal es la localidad del
+      // puesto, y hasta DOS personas pueden tener ese código — el titular
+      // (posible de baja) y el ocupante actual (posible sustituto). Antes
+      // se usaba una búsqueda genérica de cualquier campo 'codigo' en todo
+      // el árbol, que confundía el código del trabajador con el código del
+      // encargo (p.ej. encargo.codigo: 'E24051') y además solo guardaba UNA
+      // persona por documento. Se mantiene buscarPropiedad() solo como
+      // último recurso para documentos con un esquema distinto al esperado.
+      const festivoLocalDirecto = data?.centroTrabajo?.festivoLocal;
+      const festivoLocal = (festivoLocalDirecto && String(festivoLocalDirecto).trim() !== '')
+        ? festivoLocalDirecto
+        : buscarPropiedad(data,
+            ['FESTIVO LOCAL', 'FESTIVO_LOCAL', 'FESTIVOLOCAL', 'LOCALIDAD', 'MUNICIPIO'],
+            ['FESTIVO', 'LOCALIDAD', 'CENTRO', 'MUNICIPIO']);
+
+      const codigosDirectos = [data?.ocupanteActual?.codigo, data?.titular?.codigo]
+        .filter(c => c !== undefined && c !== null && String(c).trim() !== '');
+      // Si ninguna de las dos rutas directas dio un código (documento con
+      // esquema distinto), se recurre a la búsqueda genérica como respaldo.
+      const codigos = codigosDirectos.length > 0
+        ? codigosDirectos
+        : [buscarPropiedad(data,
+            ['CODIGO', 'COD', 'COD.', 'CODIGO_TRABAJADOR', 'COD_TRABAJADOR'],
+            ['CODIGO', 'COD', 'TRABAJADOR'])].filter(Boolean);
+
+      if (codigos.length > 0 && festivoLocal) {
+        const loc = normalizarTexto(festivoLocal);
+        let algunoValido = false;
+        for (const codigoRaw of codigos) {
+          const cod = normalizarCodigo(codigoRaw);
+          if (cod && loc) {
+            mapaCodigoLocalidad[cod] = loc;
+            algunoValido = true;
+          }
+        }
+        if (algunoValido) count++;
+        else docsProblematicos.push({ id: doc.id, data });
+      } else {
+        docsProblematicos.push({ id: doc.id, data });
+      }
+    });
+
+    // Colección 'personal' (la que actualiza subir_personal.py con los dos
+    // Excel de DATOS PERSONAL). Tiene prioridad sobre 'puestos' porque es
+    // la que se refresca al ejecutar el script.
+    let countPersonal = 0;
+    let avisoPersonal = '';
+    try {
+      const snapPersonal = await db.collection('personal').get();
+      snapPersonal.forEach(doc => {
+        const d = doc.data();
+        const cod = normalizarCodigo(d.cod ?? doc.id);
+        const loc = normalizarTexto(d.festivo_local);
+        if (cod && loc) { mapaCodigoLocalidad[cod] = loc; countPersonal++; }
+        if (d?.updatedAt && typeof d.updatedAt.toDate === 'function') {
+          const fecha = d.updatedAt.toDate();
+          if (!ultimaActualizacion || fecha > ultimaActualizacion) ultimaActualizacion = fecha;
+        }
+      });
+      console.log(`[Firestore] Colección 'personal': ${countPersonal} trabajadores con festivo local.`);
+    } catch (errPersonal) {
+      console.warn("[Firestore] No se pudo leer la colección 'personal':", errPersonal);
+      avisoPersonal = " · No se pudo leer la colección 'personal' (revisa las reglas)";
+    }
+    const totalTrabajadores = Object.keys(mapaCodigoLocalidad).length;
+
+    if (docsProblematicos.length > 0) {
+      console.warn(`[Firestore] ${docsProblematicos.length} documento(s) sin código o localidad reconocibles. Datos crudos:`);
+      console.table(docsProblematicos.map(d => ({ id: d.id, ...d.data })));
+    }
+    console.log(`[Firestore] Mapa código→localidad construido (${count} entradas). Usa inspeccionarCodigo('1634') en esta consola para ver el documento crudo de un código concreto.`);
+
+    if (totalTrabajadores > 0) {
+      statusEl.style.borderColor = 'rgba(34,197,94,0.3)';
+      const avisoProblemas = docsProblematicos.length > 0
+        ? ` (${docsProblematicos.length} sin reconocer, ver consola)`
+        : '';
+      const avisoFecha = ultimaActualizacion
+        ? ` · Última actualización: ${formatearFechaHora(ultimaActualizacion)}`
+        : '';
+      statusEl.innerHTML = `<i class="ti ti-circle-check" style="color: var(--success)"></i> ${totalTrabajadores} trabajadores sincronizados desde la Nube.${avisoProblemas}${avisoFecha}${avisoPersonal}`;
+    } else {
+      statusEl.style.borderColor = 'rgba(245,158,11,0.3)';
+      statusEl.innerHTML = `<i class="ti ti-alert-triangle" style="color: var(--warning)"></i> Base de datos conectada. Suba su primer listado.`;
+    }
+  } catch (error) {
+    console.error("Error al conectar con Firestore:", error);
+    statusEl.style.borderColor = 'rgba(239,68,68,0.3)';
+    statusEl.innerHTML = `<i class="ti ti-alert-triangle" style="color: var(--danger)"></i> Error de acceso a Firestore. Comprueba la pestaña Reglas.`;
+  } finally {
+    // Se marca "listo" tanto si tuvo éxito como si falló, para no bloquear
+    // el botón "Procesar" para siempre si Firestore no responde; en ese caso
+    // el respaldo local (Excel) seguirá pudiendo cubrir los códigos.
+    firestoreListo = true;
+    if (typeof actualizarEstadoBotonProcesar === 'function') actualizarEstadoBotonProcesar();
+  }
+}
+
+/**
+ * Comprueba si algún valor de 'obj' (a cualquier nivel de anidación)
+ * normaliza al código buscado.
+ */
+function contieneCodigoProfundo(obj, cod, visitados = new Set()) {
+  if (obj === null || obj === undefined) return false;
+  if (typeof obj !== 'object') return normalizarCodigo(obj) === cod;
+  if (visitados.has(obj)) return false; // evita bucles en estructuras circulares
+  visitados.add(obj);
+  return Object.values(obj).some(v => contieneCodigoProfundo(v, cod, visitados));
+}
+
+/**
+ * Utilidad de diagnóstico: pégala en la consola del navegador (F12) como
+ * inspeccionarCodigo('1634') para ver el documento crudo de Firestore que
+ * coincide con ese código (buscando en TODOS los campos, incluidos los
+ * anidados, no solo en el que la app reconoce), y qué localidad le habría
+ * asignado la app si alguna.
+ */
+function inspeccionarCodigo(codigoBuscado) {
+  const cod = normalizarCodigo(codigoBuscado);
+  const docs = (window.__firestorePuestosRaw || []).filter(d => contieneCodigoProfundo(d, cod));
+  console.log(`Documento(s) que contienen el código '${cod}' en algún campo (incluidos anidados):`, docs);
+  console.log(`Localidad asignada actualmente por la app a '${cod}':`, mapaCodigoLocalidad[cod] || '(ninguna)');
+  if (docs.length === 0) {
+    console.log(`Total de documentos cargados desde Firestore: ${(window.__firestorePuestosRaw || []).length}. Si es 0, revisa que la conexión a Firestore se haya completado antes de ejecutar esto.`);
+  }
+  return docs;
+}
+
+// Se dispara desde onAuthStateChanged, una vez hay sesión anónima activa
+// (si se llamara antes, las reglas seguras rechazarían la consulta).
+auth.onAuthStateChanged(user => {
+  if (user) cargarPersonalFirestore();
+});
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const btnProcess = document.getElementById('btnProcess');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  agregarArchivos([...e.dataTransfer.files].filter(f => f.name.endsWith('.xlsx')));
+});
+
+fileInput.addEventListener('change', () => {
+  agregarArchivos([...fileInput.files]);
+  fileInput.value = '';
+});
+
+function agregarArchivos(nuevos) {
+  nuevos.forEach(f => {
+    if (!archivosSeleccionados.find(a => a.name === f.name)) {
+      archivosSeleccionados.push(f);
+    }
+  });
+  renderFileList();
+}
+
+function renderFileList() {
+  fileList.innerHTML = '';
+  archivosSeleccionados.forEach((f, idx) => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.innerHTML = `<i class="ti ti-file-spreadsheet"></i>
+      <span class="file-name">${f.name}</span>
+      <button class="file-remove" onclick="quitarArchivo(${idx})"><i class="ti ti-x"></i></button>`;
+    fileList.appendChild(item);
+  });
+  actualizarEstadoBotonProcesar();
+}
+
+// Activa "Procesar" solo cuando hay archivos Y la sincronización con
+// Firestore ya ha terminado (evita procesar con mapaCodigoLocalidad
+// todavía vacío/incompleto, que marcaba códigos existentes como
+// "sin localidad" solo por mala suerte de tiempos).
+function actualizarEstadoBotonProcesar() {
+  const hayArchivos = archivosSeleccionados.length > 0;
+  btnProcess.disabled = !hayArchivos || !firestoreListo || !festivosListo;
+  btnProcess.title = !hayArchivos
+    ? ''
+    : (!firestoreListo ? 'Esperando a que termine la sincronización con Firestore…'
+      : (!festivosListo ? 'Cargando el calendario oficial de festivos…' : ''));
+}
+
+function quitarArchivo(idx) {
+  archivosSeleccionados.splice(idx, 1);
+  renderFileList();
+}
+
+// ---- Respaldo local de Datos Personal (solo tapa huecos de Firestore) -----
+const dropZoneRespaldo = document.getElementById('dropZoneRespaldo');
+const fileInputRespaldo = document.getElementById('fileInputRespaldo');
+const fileListRespaldo = document.getElementById('fileListRespaldo');
+
+dropZoneRespaldo.addEventListener('dragover', e => { e.preventDefault(); dropZoneRespaldo.classList.add('drag-over'); });
+dropZoneRespaldo.addEventListener('dragleave', () => dropZoneRespaldo.classList.remove('drag-over'));
+dropZoneRespaldo.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZoneRespaldo.classList.remove('drag-over');
+  agregarArchivosRespaldo([...e.dataTransfer.files].filter(f => /\.xlsx$/i.test(f.name)));
+});
+fileInputRespaldo.addEventListener('change', () => {
+  agregarArchivosRespaldo([...fileInputRespaldo.files]);
+  fileInputRespaldo.value = '';
+});
+
+function agregarArchivosRespaldo(nuevos) {
+  nuevos.forEach(f => {
+    if (!archivosRespaldo.find(a => a.name === f.name)) archivosRespaldo.push(f);
+  });
+  renderFileListRespaldo();
+  construirMapaRespaldo();
+}
+
+function renderFileListRespaldo() {
+  fileListRespaldo.innerHTML = '';
+  archivosRespaldo.forEach((f, idx) => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.innerHTML = `<i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
+      <span class="file-name">${f.name}</span>
+      <button class="file-remove" title="Quitar" onclick="quitarArchivoRespaldo(${idx})">
+        <i class="ti ti-x" style="font-size:14px" aria-hidden="true"></i>
+      </button>`;
+    fileListRespaldo.appendChild(item);
+  });
+}
+
+function quitarArchivoRespaldo(idx) {
+  archivosRespaldo.splice(idx, 1);
+  renderFileListRespaldo();
+  construirMapaRespaldo();
+}
+
+/**
+ * Lee los Excel de respaldo (formato DATOS_PERSONAL: columnas COD. y
+ * FESTIVO LOCAL) y construye mapaCodigoLocalidadRespaldo. Esto se queda
+ * en memoria del navegador: nunca se envía ni se guarda en Firestore.
+ */
+async function construirMapaRespaldo() {
+  mapaCodigoLocalidadRespaldo = {};
+  const el = document.getElementById('estadoRespaldo');
+  if (archivosRespaldo.length === 0) { el.style.display = 'none'; return; }
+
+  let total = 0;
+  for (const archivo of archivosRespaldo) {
+    try {
+      const rows = await leerExcel(archivo);
+      if (rows.length < 2) continue;
+      const header = rows[0].map(h => normalizarTexto(h));
+      const idxCod = header.findIndex(h => h === 'COD.' || h === 'COD');
+      const idxLoc = header.findIndex(h => h === 'FESTIVO LOCAL');
+      if (idxCod === -1 || idxLoc === -1) continue;
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r || r[idxCod] === undefined || r[idxCod] === null || r[idxCod] === '') continue;
+        const cod = normalizarCodigo(r[idxCod]);
+        const loc = normalizarTexto(r[idxLoc]);
+        if (cod && loc) { mapaCodigoLocalidadRespaldo[cod] = loc; total++; }
+      }
+    } catch (err) {
+      console.error(`Error leyendo respaldo '${archivo.name}':`, err);
+    }
+  }
+
+  el.style.display = '';
+  el.style.borderColor = 'rgba(96,165,250,0.3)';
+  el.innerHTML = `<i class="ti ti-shield-half" style="color: var(--accent2)"></i> Respaldo local: ${total} trabajador(es) (solo en este navegador, no se sube a Firestore).`;
+}
+
+// ---- Pestañas -------------------------------------------------------------
+function cambiarPestana(tab) {
+  document.getElementById('tabProcesar').classList.toggle('active', tab === 'procesar');
+  document.getElementById('tabMantenimiento').classList.toggle('active', tab === 'mantenimiento');
+  document.getElementById('tabLaboral').classList.toggle('active', tab === 'laboral');
+  document.getElementById('tabContratos').classList.toggle('active', tab === 'contratos');
+  document.getElementById('tabBtnContratos').classList.toggle('active', tab === 'contratos');
+  document.getElementById('tabBtnProcesar').classList.toggle('active', tab === 'procesar');
+  document.getElementById('tabBtnMantenimiento').classList.toggle('active', tab === 'mantenimiento');
+  document.getElementById('tabBtnLaboral').classList.toggle('active', tab === 'laboral');
+}
+
+// ---- Mantenimiento: Festivos 2027 (persistidos en este navegador) --------
+const LOCALSTORAGE_KEY_FESTIVOS_2027 = 'gpex_procesador_variables_festivos_2027_v1';
+
+/** 'DD/MM' o 'D/M' -> 'MM-DD'. Devuelve null si el formato no es válido. */
+function ddmmATextoMMDD(str) {
+  const m = String(str).trim().match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (!m) return null;
+  const dd = m[1].padStart(2, '0');
+  const mm = m[2].padStart(2, '0');
+  return `${mm}-${dd}`;
+}
+
+/** 'MM-DD' -> 'DD/MM', para mostrar en los textareas. */
+function mmddATextoDDMM(str) {
+  const [mm, dd] = String(str).split('-');
+  return `${dd}/${mm}`;
+}
+
+function parsearNacional2027(texto) {
+  const fechas = [];
+  texto.split('\n').forEach(linea => {
+    const mmdd = ddmmATextoMMDD(linea);
+    if (mmdd) fechas.push(mmdd);
+  });
+  return [...new Set(fechas)];
+}
+
+function parsearLocales2027(texto) {
+  const mapa = {};
+  texto.split('\n').forEach(linea => {
+    const partes = linea.split(';').map(p => p.trim()).filter(Boolean);
+    if (partes.length < 2) return;
+    const localidad = normalizarTexto(partes[0]);
+    const fechas = partes.slice(1).map(ddmmATextoMMDD).filter(Boolean);
+    if (localidad && fechas.length) mapa[localidad] = fechas;
+  });
+  return mapa;
+}
+
+function renderizarFestivos2027EnFormulario() {
+  document.getElementById('textNacional2027').value = FESTIVOS_EXTREMADURA_2027.map(mmddATextoDDMM).join('\n');
+  document.getElementById('textLocales2027').value = Object.entries(FESTIVOS_LOCALES_2027)
+    .map(([loc, fechas]) => `${loc}; ${fechas.map(mmddATextoDDMM).join('; ')}`)
+    .join('\n');
+}
+
+function cargarFestivos2027() {
+  try {
+    const raw = localStorage.getItem(LOCALSTORAGE_KEY_FESTIVOS_2027);
+    if (!raw) { renderizarFestivos2027EnFormulario(); return; }
+    const datos = JSON.parse(raw);
+    if (Array.isArray(datos.nacional)) FESTIVOS_EXTREMADURA_2027 = datos.nacional;
+    if (datos.locales && typeof datos.locales === 'object') FESTIVOS_LOCALES_2027 = datos.locales;
+  } catch (err) {
+    console.warn('No se pudo leer la configuración de festivos 2027:', err);
+  }
+  renderizarFestivos2027EnFormulario();
+}
+
+function guardarFestivos2027() {
+  const el = document.getElementById('estadoFestivos2027');
+  try {
+    const nacional = parsearNacional2027(document.getElementById('textNacional2027').value);
+    const locales = parsearLocales2027(document.getElementById('textLocales2027').value);
+
+    FESTIVOS_EXTREMADURA_2027 = nacional;
+    FESTIVOS_LOCALES_2027 = locales;
+    localStorage.setItem(LOCALSTORAGE_KEY_FESTIVOS_2027, JSON.stringify({ nacional, locales }));
+
+    renderizarFestivos2027EnFormulario();
+    el.style.display = '';
+    el.style.borderColor = 'rgba(34,197,94,0.3)';
+    el.innerHTML = `<i class="ti ti-circle-check" style="color: var(--success)"></i> Guardado: ${nacional.length} festivo(s) nacional(es)/autonómico(s) y ${Object.keys(locales).length} localidad(es) para 2027.`;
+  } catch (err) {
+    el.style.display = '';
+    el.style.borderColor = 'rgba(239,68,68,0.3)';
+    el.innerHTML = `<i class="ti ti-alert-triangle" style="color: var(--danger)"></i> Error: ${err.message}`;
+  }
+}
+
+// ---- Contratos: complementos incluidos por contrato (editables) -----------
+const CONTRATOS_DEFECTO = {
+  peligrosidad: [
+    { cod: '004216', nombre: 'MARIA GALAN CARRILLO' },
+    { cod: '005421', nombre: 'ALBA CAMPOS DE LA MONTAÑA' },
+    { cod: '000757', nombre: 'ANA ISABEL BLAZQUEZ DIAZ' },
+    { cod: '004040', nombre: 'SUSANA PARRON CARRILLO' }
+  ],
+  turnicidad: [
+    { cod: '001590', nombre: 'SANTIAGO MARTIN MARTIN' },
+    { cod: '003718', nombre: 'CARLOS IGLESIAS SALAS' },
+    { cod: '004879', nombre: 'JAVIER REBOLLO NEVADO' },
+    { cod: '005421', nombre: 'ALBA CAMPOS DE LA MONTAÑA' },
+    { cod: '001523', nombre: 'MARIA INES GARCIA HERRERO' },
+    { cod: '001524', nombre: 'JORGE FERNANDEZ DIAZ' },
+    { cod: '001528', nombre: 'ROSA MARIA ESCOBAR PANIAGUA' },
+    { cod: '001529', nombre: 'EVA MARIA LOPEZ SERRANO' },
+    { cod: '001531', nombre: 'SORAYA TOME MORDILLO' },
+    { cod: '001533', nombre: 'MARIA PILAR MARTIN VIVAS' },
+    { cod: '001539', nombre: 'MARIA CECILIA FERNANDEZ SANCHEZ' },
+    { cod: '001540', nombre: 'ANA ISABEL FERNANDEZ REAL' },
+    { cod: '001798', nombre: 'DIANA SANCHEZ AVILA' },
+    { cod: '004224', nombre: 'HISADO IGLESIAS, ANA BELEN' },
+    { cod: '004728', nombre: 'ELENA ROJO FRAGOSO' },
+    { cod: '004729', nombre: 'ISABEL GALLARDO LORITE' },
+    { cod: '004092', nombre: 'ALEJANDRO TORNERO HERRERO' },
+    { cod: '004864', nombre: 'ANTONIO CAMPOS HERNANDEZ' },
+    { cod: '001536', nombre: 'BARBARA PEREZ PEREZ' }
+  ]
+};
+const LOCALSTORAGE_KEY_CONTRATOS = 'gpex_procesador_variables_contratos_v1';
+let contratos = JSON.parse(JSON.stringify(CONTRATOS_DEFECTO));
+
+function claveContrato(cod) { return normalizarCodigoLaboral(cod); }
+function tieneTurnicidadContrato(cod) { return contratos.turnicidad.some(c => claveContrato(c.cod) === claveContrato(cod)); }
+function tienePeligrosidadContrato(cod) { return contratos.peligrosidad.some(c => claveContrato(c.cod) === claveContrato(cod)); }
+function escHtml(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+// Las listas se guardan en la base de datos compartida del área (proyecto cuadrante-secona),
+// para que un cambio lo vea todo el equipo y no se pierda al cambiar de navegador o de equipo.
+let contratosRef = null;
+try {
+  const appCompartida = firebase.apps.find(a => a.name === 'compartida') || firebase.initializeApp({
+    apiKey: "AIzaSyC4GTuNF806rml_rfzwvzkr_rqucfzijxo",
+    authDomain: "cuadrante-secona.firebaseapp.com",
+    projectId: "cuadrante-secona",
+    appId: "1:175128885677:web:be910a122535a9bd4cc924"
+  }, 'compartida');
+  contratosRef = appCompartida.firestore().collection('cv_config').doc('contratos');
+} catch (err) { console.warn('No se pudo conectar con la base de datos compartida:', err); }
+
+function avisoContratos(texto, error) {
+  const el = document.getElementById('estadoContratosTexto');
+  if (!el) return;
+  el.textContent = texto;
+  el.style.color = error ? 'var(--danger)' : '';
+}
+
+function contratosValidos(d) { return d && Array.isArray(d.peligrosidad) && Array.isArray(d.turnicidad); }
+
+function cargarContratos() {
+  // 1) Mientras llega la base de datos, lo último guardado en este navegador
+  try {
+    const raw = localStorage.getItem(LOCALSTORAGE_KEY_CONTRATOS);
+    if (raw) { const d = JSON.parse(raw); if (contratosValidos(d)) contratos = d; }
+  } catch (err) { console.warn('No se pudo leer la configuración de contratos:', err); }
+  renderContratos();
+  if (!contratosRef) { avisoContratos('Sin conexión con la base de datos compartida: los cambios solo se guardan en este navegador.', true); return; }
+  // 2) La base de datos compartida manda (en tiempo real)
+  contratosRef.onSnapshot(doc => {
+    if (doc.exists && contratosValidos(doc.data())) {
+      const d = doc.data();
+      contratos = { peligrosidad: d.peligrosidad, turnicidad: d.turnicidad };
+      try { localStorage.setItem(LOCALSTORAGE_KEY_CONTRATOS, JSON.stringify(contratos)); } catch (e) {}
+      renderContratos();
+      avisoContratos('Los cambios se guardan en la base de datos compartida (los ve todo el equipo).');
+    } else {
+      // Primera vez: se sube la lista actual de este navegador
+      guardarContratos();
+    }
+  }, err => {
+    console.error(err);
+    avisoContratos('No se pudo leer la base de datos compartida (' + (err.code || err.message) + '): los cambios solo se guardan en este navegador.', true);
+  });
+}
+
+function guardarContratos() {
+  try { localStorage.setItem(LOCALSTORAGE_KEY_CONTRATOS, JSON.stringify(contratos)); }
+  catch (err) { console.warn('No se pudo guardar la configuración de contratos:', err); }
+  if (contratosRef) {
+    contratosRef.set({ peligrosidad: contratos.peligrosidad, turnicidad: contratos.turnicidad, actualizado: new Date().toISOString() })
+      .catch(err => { console.error(err); avisoContratos('No se pudo guardar en la base de datos compartida (' + (err.code || err.message) + ').', true); });
+  }
+}
+
+function renderContratos() {
+  [['peligrosidad', 'listaPeligrosidad'], ['turnicidad', 'listaTurnicidad']].forEach(([tipo, id]) => {
+    const lista = contratos[tipo];
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (lista.length === 0) { el.innerHTML = '<p class="maint-hint">Sin trabajadores en esta lista.</p>'; return; }
+    el.innerHTML = `<table class="contrato-tabla"><thead><tr><th>Código</th><th>Trabajador</th><th></th></tr></thead><tbody>` +
+      lista.map((c, i) => `<tr>
+        <td class="cod">${escHtml(c.cod)}</td>
+        <td class="nom">${escHtml(c.nombre)}</td>
+        <td class="acc"><button class="btn-quitar-contrato" title="Quitar de la lista" onclick="quitarContrato('${tipo}', ${i})"><i class="ti ti-trash" aria-hidden="true"></i></button></td>
+      </tr>`).join('') + `</tbody></table><p class="maint-hint" style="margin-top:8px;">${lista.length} trabajador(es)</p>`;
+  });
+}
+
+function agregarContrato(tipo) {
+  const sufijo = tipo === 'peligrosidad' ? 'Peligrosidad' : 'Turnicidad';
+  const inCod = document.getElementById('addCod' + sufijo);
+  const inNom = document.getElementById('addNom' + sufijo);
+  const cod = claveContrato(inCod.value.trim());
+  const nombre = inNom.value.trim();
+  if (!cod) { inCod.focus(); return; }
+  if (contratos[tipo].some(c => claveContrato(c.cod) === cod)) {
+    inCod.value = ''; inNom.value = '';
+    return;
+  }
+  contratos[tipo].push({ cod, nombre });
+  contratos[tipo].sort((a, b) => a.cod.localeCompare(b.cod));
+  inCod.value = ''; inNom.value = '';
+  guardarContratos();
+  renderContratos();
+  inCod.focus();
+}
+
+function quitarContrato(tipo, idx) {
+  contratos[tipo].splice(idx, 1);
+  guardarContratos();
+  renderContratos();
+}
+
+function restaurarContratos() {
+  if (!confirm('¿Restaurar las listas iniciales? Se perderán los cambios guardados para todo el equipo.')) return;
+  contratos = JSON.parse(JSON.stringify(CONTRATOS_DEFECTO));
+  guardarContratos();
+  renderContratos();
+}
+
+cargarContratos();
+cargarFestivos2027();
+cargarFestivosOficiales();
+
+function log(msg, tipo = 'info') {
+  const logArea = document.getElementById('logArea');
+  logArea.classList.add('visible');
+  const line = document.createElement('div');
+  line.className = `log-line ${tipo}`;
+  line.textContent = msg;
+  logArea.appendChild(line);
+  logArea.scrollTop = logArea.scrollHeight;
+}
+
+function leerExcel(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'DD/MM/YYYY' });
+        resolve(rows);
+      } catch(err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function parseFecha(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1]));
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+/**
+ * Minutos nocturnos de una fila: [Min_Noche (22:00-24:00), Min_Madrugada (00:00-06:00)].
+ * Reúne los intervalos trabajados de DOS fuentes:
+ *   1) Columna Fichaje: pares "HH:MM E" / "HH:MM S".
+ *   2) Columna Tipo Salida: tramos "(HH:MM a HH:MM)" de las salidas de trabajo
+ *      (p.ej. "Salida con desplazamiento (17:00 a 23:59)"), que no generan fichaje.
+ * Los intervalos se fusionan antes de medir, para no contar dos veces un mismo
+ * tramo si aparece en ambas columnas. Una salida que termina a las 23:59 se
+ * considera hasta las 24:00. Si un tramo cruza medianoche dentro de la misma
+ * fila (p.ej. "20:00 a 02:00"), la parte posterior a las 00:00 pertenece a esa
+ * misma jornada nocturna y se suma a Min_Noche (no a la madrugada del día, que
+ * se reserva para combinarse con la noche del día anterior).
+ */
+function extraerTramosTipoSalida(tipoSalidaStr) {
+  const tramos = [];
+  if (!tipoSalidaStr) return tramos;
+  const re = /(\d{1,2})[:.](\d{2})\s*(?:a|-|–|hasta)\s*(\d{1,2})[:.](\d{2})/gi;
+  let m;
+  while ((m = re.exec(String(tipoSalidaStr))) !== null) {
+    const e = parseInt(m[1]) * 60 + parseInt(m[2]);
+    let s = parseInt(m[3]) * 60 + parseInt(m[4]);
+    if (isNaN(e) || isNaN(s)) continue;
+    if (s === 1439) s = 1440;         // 23:59 = fin del día
+    if (s <= e) s += 1440;            // cruza medianoche
+    tramos.push([e, s]);
+  }
+  return tramos;
+}
+
+function calcularMinutosFila(fichajesStr, tipoSalidaStr) {
+  const intervalos = [];
+
+  if (fichajesStr) {
+    const texto = String(fichajesStr).toUpperCase().replace(/\n|\r/g, ' ').trim();
+    const elementos = texto.replace(/,/g, ' ').split(/\s+/).filter(Boolean);
+    const entradas = [], salidas = [];
+    for (let i = 0; i < elementos.length - 1; i++) {
+      if (elementos[i].includes(':') && (elementos[i+1] === 'E' || elementos[i+1] === 'S')) {
+        const partes = elementos[i].split(':');
+        const h = parseInt(partes[0]), m = parseInt(partes[1]);
+        if (!isNaN(h) && !isNaN(m)) {
+          const minutos = h * 60 + m;
+          if (elementos[i+1] === 'E') entradas.push(minutos);
+          else salidas.push(minutos);
+        }
+      }
+    }
+    const pares = Math.min(entradas.length, salidas.length);
+    for (let j = 0; j < pares; j++) {
+      const e = entradas[j], s = salidas[j];
+      if (s > e) intervalos.push([e, s]);
+    }
+  }
+
+  extraerTramosTipoSalida(tipoSalidaStr).forEach(t => intervalos.push(t));
+  if (intervalos.length === 0) return [0, 0];
+
+  // Fusionar solapes
+  intervalos.sort((a, b) => a[0] - b[0]);
+  const fusion = [intervalos[0].slice()];
+  for (let k = 1; k < intervalos.length; k++) {
+    const ult = fusion[fusion.length - 1];
+    if (intervalos[k][0] <= ult[1]) ult[1] = Math.max(ult[1], intervalos[k][1]);
+    else fusion.push(intervalos[k].slice());
+  }
+
+  const solape = (a, b, c, d) => Math.max(0, Math.min(b, d) - Math.max(a, c));
+  let minNoche = 0, minMadrugada = 0;
+  fusion.forEach(([e, s]) => {
+    minMadrugada += solape(e, s, 0, 360);          // 00:00-06:00 del propio día
+    minNoche     += solape(e, s, 1320, 1440);      // 22:00-24:00
+    minNoche     += solape(e, s, 1440, 1440 + 360); // 00:00-06:00 tras cruzar medianoche
+  });
+  return [minNoche, minMadrugada];
+}
+
+// ---- Plus turnicidad -------------------------------------------------------
+// Se abona (66,82 €/mes, importe fijo) cuando, dentro del mismo mes, un
+// trabajador realiza turnos de al menos 2 tipos distintos (Mañana/Tarde/
+// Noche). El tipo de cada jornada se determina por su hora de ENTRADA y
+// duración total (primera entrada -> última salida del día), comparándola
+// con los turnos conocidos (de cualquier centro, ya no depende del
+// encargo). Los turnos "combinados" (MT, CMT) cuentan como Mañana Y Tarde
+// a la vez. BERREA CENTROS no cuenta (turno especial, se ignora).
+//
+// Una jornada NO cuenta como turno (aunque su duración se parezca a uno)
+// si ese día tiene algo en la columna "Tipo Salida" (p.ej. "Salida con
+// desplazamiento...", "Salida sin desplazamiento..."): es una salida de
+// trabajo, no un turno real, aunque a veces dure lo mismo que uno (p.ej.
+// una jornada de 08:00 a 17:00 con un descanso de ~45 min para comer en
+// medio — ese hueco no afecta al cálculo de duración porque solo se usa
+// primera entrada -> última salida, pero el propio Tipo_Salida ya basta
+// para excluirla).
+const NOMBRE_TIPO_TURNO = { M: 'Mañana', T: 'Tarde', N: 'Noche' };
+function formatearHora(min) {
+  if (min === null || min === undefined) return '';
+  const h = Math.floor(min / 60), m = min % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+function formatearFecha(dia) {
+  if (!(dia instanceof Date) || isNaN(dia)) return '';
+  return `${String(dia.getDate()).padStart(2, '0')}/${String(dia.getMonth() + 1).padStart(2, '0')}/${dia.getFullYear()}`;
+}
+function formatearFechaHora(dia) {
+  if (!(dia instanceof Date) || isNaN(dia)) return '';
+  return `${formatearFecha(dia)} ${String(dia.getHours()).padStart(2, '0')}:${String(dia.getMinutes()).padStart(2, '0')}`;
+}
+
+const TURNOS_CONOCIDOS = [
+  { codigo: 'M',   tipo: ['M'],      entrada: 8 * 60,        duracion: 7.0,        ignorar: false },
+  { codigo: 'MC',  tipo: ['M'],      entrada: 9 * 60 + 30,   duracion: 5.5,        ignorar: false },
+  { codigo: 'MT',  tipo: ['M', 'T'], entrada: 9 * 60 + 30,   duracion: 9.5,        ignorar: false },
+  { codigo: 'T1',  tipo: ['T'],      entrada: 15 * 60,       duracion: 4.0,        ignorar: false },
+  { codigo: 'CM',  tipo: ['M'],      entrada: 8 * 60 + 30,   duracion: 6.5,        ignorar: false },
+  { codigo: 'CMT', tipo: ['M', 'T'], entrada: 9 * 60,        duracion: 9 + 50/60,  ignorar: false },
+  { codigo: 'BC',  tipo: null,       entrada: 15 * 60,       duracion: 8.5,        ignorar: true  },
+  { codigo: 'T2',  tipo: ['T'],      entrada: 14 * 60 + 30,  duracion: 7.5,        ignorar: false },
+  { codigo: 'TN',  tipo: ['N'],      entrada: 22 * 60,       duracion: 2.0,        ignorar: false },
+  { codigo: 'N',   tipo: ['N'],      entrada: 0,             duracion: 5.5,        ignorar: false }
+];
+
+/** Primera entrada y duración total (última salida - primera entrada) del día. */
+function primeraEntradaYDuracion(fichajesStr) {
+  if (!fichajesStr) return null;
+  const texto = String(fichajesStr).toUpperCase().replace(/\n|\r/g, ' ').trim();
+  const elementos = texto.replace(/,/g, ' ').split(/\s+/).filter(Boolean);
+  const entradas = [], salidas = [];
+  for (let i = 0; i < elementos.length - 1; i++) {
+    if (elementos[i].includes(':') && (elementos[i+1] === 'E' || elementos[i+1] === 'S')) {
+      const partes = elementos[i].split(':');
+      const h = parseInt(partes[0]), m = parseInt(partes[1]);
+      if (!isNaN(h) && !isNaN(m)) {
+        const minutos = h * 60 + m;
+        if (elementos[i+1] === 'E') entradas.push(minutos);
+        else salidas.push(minutos);
+      }
+    }
+  }
+  if (entradas.length === 0 || salidas.length === 0) return null;
+  const entradaMin = entradas[0];
+  let salidaMin = salidas[salidas.length - 1];
+  let duracionMin = salidaMin - entradaMin;
+  if (duracionMin < 0) duracionMin += 1440; // por si una sola fila cruzase medianoche
+  return { entradaMin, duracionHoras: duracionMin / 60 };
+}
+
+// ---- Plus nocturnidad — dos métodos seleccionables --------------------------
+// UMBRAL_NOCTURNIDAD_MIN: minutos nocturnos (tramo 22:00-24:00 + tramo
+// 00:00-06:00 del día siguiente) necesarios para devengar 1 unidad completa.
+// Ambos métodos parten de los mismos Min_Noche/Min_Madrugada por fila,
+// calculados ya por intersección de intervalos en calcularMinutosFila().
+const UMBRAL_NOCTURNIDAD_MIN = 210; // 3h30
+
+/**
+ * Método "CUIDADORES DE FAUNA" (p.ej. 05.01.02 CRF Los Hornos): horario previsto
+ * de 22:00 a 05:30 del día siguiente, que el listado parte por días:
+ *   22:00 E - 23:59 S (noche entrante)  /  00:00 E - 05:30 S (noche saliente).
+ * Se abona 1 unidad por cada entrada a las 00:00 (noche saliente). Así cada
+ * turno de noche completo cuenta una sola vez y se paga en el mes en que
+ * termina, sin proporcionalidades ni umbrales de minutos.
+ * Imputa la unidad al día de la fila que contiene la entrada 00:00.
+ */
+function calcularNocturnidadCuidadores(df) {
+  const reEntrada0000 = /(^|[\s,])0?0:00\s*E\b/i;
+  for (let i = 0; i < df.length; i++) {
+    df[i].Plus_Nocturnidad = reEntrada0000.test(String(df[i].Fichajes || '')) ? 1 : 0;
+  }
+}
+
+/**
+ * Método "proporcional" — criterio del convenio:
+ *   "El valor de la jornada nocturna se abonará cuando se realicen en horario
+ *    nocturno (22:00-06:00) al menos la mitad de las horas de la jornada
+ *    diaria; en caso contrario, proporcionalmente al tiempo realizado."
+ * Referencia: jornada de 7 h -> mitad = 210 min.
+ *   - >= 210 min nocturnos en la jornada -> 1 unidad completa.
+ *   - <  210 min -> minutos / 210, redondeado a 2 decimales.
+ *
+ * Una noche que cruza medianoche es UNA sola jornada: los minutos 22:00-24:00
+ * del día D se suman a los 00:00-06:00 del día D+1 (mismo trabajador, días
+ * consecutivos) y el plus se imputa al día D. Esa madrugada del día D+1 queda
+ * "consumida", pero el tramo 22:00-24:00 del día D+1 sigue contando para su
+ * propia noche (antes se saltaba la fila entera y se perdía en noches seguidas).
+ * Una madrugada no precedida de noche (p.ej. jornada que empieza a las 00:00)
+ * cuenta como jornada propia de ese día.
+ * Requiere `df` ordenado por Codigo y luego por Dia.
+ */
+function calcularNocturnidadProporcional(df) {
+  const unidades = min => min >= UMBRAL_NOCTURNIDAD_MIN ? 1
+    : (min > 0 ? Math.round((min / UMBRAL_NOCTURNIDAD_MIN) * 100) / 100 : 0);
+  const madrugadaConsumida = new Array(df.length).fill(false);
+
+  for (let i = 0; i < df.length; i++) {
+    const cur = df[i];
+    let plus = 0;
+
+    // Madrugada propia no imputada a la noche anterior -> jornada independiente
+    if (!madrugadaConsumida[i]) plus += unidades(cur.Min_Madrugada || 0);
+
+    // Noche del día (22:00-24:00), sumando la madrugada del día siguiente si continúa
+    let minNoche = cur.Min_Noche || 0;
+    if (minNoche > 0 && i + 1 < df.length) {
+      const next = df[i + 1];
+      if (cur.Codigo === next.Codigo && cur.Dia && next.Dia &&
+          Math.round((next.Dia - cur.Dia) / 86400000) === 1 && (next.Min_Madrugada || 0) > 0) {
+        minNoche += next.Min_Madrugada;
+        madrugadaConsumida[i + 1] = true;
+      }
+    }
+    plus += unidades(minNoche);
+
+    df[i].Plus_Nocturnidad = Math.round(plus * 100) / 100;
+  }
+}
+
+/**
+ * Turnos de noche que cruzan el límite de mes.
+ * Un turno de noche (22:00 -> 06:00) se paga en el MES EN QUE TERMINA:
+ *  - Último día del mes: si el día acaba a las 23:59 (cierre automático de
+ *    medianoche) y no hay fila del día siguiente, la noche queda incompleta:
+ *    se pone a 0 la parte de noche (22:00-24:00) y se avisa. El turno se
+ *    abona completo el mes siguiente, evitando cobrar una fracción y luego
+ *    el turno entero.
+ *  - Día 1: si empieza a las 00:00 y no hay noche previa en el listado, esa
+ *    madrugada es la continuación de un turno del mes anterior: se abona
+ *    aquí y se deja constancia en la nota.
+ * Solo anota y ajusta; no modifica nada más. Requiere `df` ordenado por
+ * Codigo y luego por Dia, con Plus_Nocturnidad ya calculado.
+ */
+function ajustarNocturnidadLimiteMes(df, soloNotas = false) {
+  const unidades = min => min >= UMBRAL_NOCTURNIDAD_MIN ? 1
+    : (min > 0 ? Math.round((min / UMBRAL_NOCTURNIDAD_MIN) * 100) / 100 : 0);
+  for (let i = 0; i < df.length; i++) {
+    const cur = df[i];
+    if (!(cur.Dia instanceof Date) || isNaN(cur.Dia)) continue;
+    const prev = i > 0 ? df[i - 1] : null;
+    const next = i + 1 < df.length ? df[i + 1] : null;
+    const hayPrev = prev && prev.Codigo === cur.Codigo && prev.Dia && Math.round((cur.Dia - prev.Dia) / 86400000) === 1;
+    const hayNext = next && next.Codigo === cur.Codigo && next.Dia && Math.round((next.Dia - cur.Dia) / 86400000) === 1;
+    const ultimoDiaMes = new Date(cur.Dia.getFullYear(), cur.Dia.getMonth() + 1, 0).getDate();
+    const fich = String(cur.Fichajes || '').toUpperCase();
+
+    // Día 1: madrugada que continúa un turno del mes anterior
+    if (cur.Dia.getDate() === 1 && !hayPrev && (cur.Min_Madrugada || 0) > 0 && /^\s*00:00\s*E/.test(fich)) {
+      cur.Nota_Nocturnidad = `La madrugada del día 1 (${cur.Min_Madrugada} min) continúa el turno de noche del último día del mes anterior; ese turno se abona completo en este mes.`;
+    }
+
+    // Último día del mes: noche sin continuación disponible
+    if (cur.Dia.getDate() === ultimoDiaMes && !hayNext && (cur.Min_Noche || 0) > 0 && /23:59\s*S/.test(fich)) {
+      const aRestar = unidades(cur.Min_Noche);
+      if (!soloNotas && aRestar > 0) {
+        cur.Plus_Nocturnidad = Math.max(0, Math.round(((cur.Plus_Nocturnidad || 0) - aRestar) * 100) / 100);
+      }
+      cur.Nota_Nocturnidad = `Turno de noche pendiente de continuación (${cur.Min_Noche} min de noche el último día del mes): se abonará completo el mes siguiente, con la madrugada del día 1.`;
+    }
+  }
+}
+
+const UMBRAL_ENTRADA_MIN = 35;    // ventana admitida entre la entrada real y la del turno
+const UMBRAL_DURACION_MIN = 120;  // tolerancia en duración, ya con la entrada encajada
+
+/**
+ * Clasifica una jornada. Devuelve un array con uno o dos tipos ('M'/'T'/'N')
+ * que aporta esa jornada, o null si no cuenta (es una salida de trabajo
+ * según Tipo_Salida, un turno ignorado tipo BC, o no se parece a ningún
+ * turno conocido — p.ej. horas sueltas de una hora extra, o un día largo
+ * ocasional de un trabajador con horario fijo).
+ *
+ * La hora de ENTRADA es un filtro obligatorio (±45 min): un día que empieza
+ * a las 08:00 nunca se confunde con el turno MT (09:30) por mucho que ese
+ * día en concreto se alargue y su duración total se parezca a la de un MT —
+ * antes se dejaba que una duración parecida compensara una entrada muy
+ * alejada, y eso disparaba turnicidad en trabajadores de horario fijo que
+ * un día puntual se quedan más tiempo. Solo entre los turnos cuya entrada
+ * encaja se elige el de duración más parecida.
+ */
+function clasificarTurno(entradaMin, duracionHoras, tipoSalida) {
+  if (tipoSalida && String(tipoSalida).trim() !== '') return null; // salida de trabajo, no es turno
+
+  const candidatos = TURNOS_CONOCIDOS.filter(t => {
+    const distEntrada = Math.abs(entradaMin - t.entrada);
+    const distEntradaCircular = Math.min(distEntrada, 1440 - distEntrada); // cruce de medianoche
+    return distEntradaCircular <= UMBRAL_ENTRADA_MIN;
+  });
+  if (candidatos.length === 0) return null;
+
+  let mejor = null, mejorDist = Infinity;
+  candidatos.forEach(t => {
+    const dist = Math.abs(duracionHoras - t.duracion) * 60;
+    if (dist < mejorDist) { mejorDist = dist; mejor = t; }
+  });
+  if (!mejor || mejorDist > UMBRAL_DURACION_MIN || mejor.ignorar) return null;
+  return mejor.tipo;
+}
+
+async function procesarArchivos() {
+  if (archivosSeleccionados.length === 0) return;
+
+  document.getElementById('logArea').innerHTML = '';
+  btnProcess.disabled = true;
+  datosFinales = [];
+  datosFinalesDiarios = [];
+  detalleTurnicidad = {};
+  candidatosTurnicidad = [];
+  localidadesNoReconocidas = new Set();
+  codigosSinLocalidad = new Set();
+  codigosResueltosPorRespaldo = new Set();
+  
+  // Valor fijo asignado a 1 para festivos detectados
+  const valorFestivoLocal = 1;
+
+  // Método de cálculo del plus de nocturnidad elegido en el panel de configuración
+  const metodoNocturnidad = document.getElementById('metodoNocturnidad')?.value || 'proporcional';
+
+  const MESES_ABREV = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  let encargoAccionDetectado = null; // se toma del primer archivo que lo tenga (A2/A3)
+  let mesDetectado = null;           // se deduce de la primera fecha válida encontrada
+
+  for (let idx = 0; idx < archivosSeleccionados.length; idx++) {
+    const archivo = archivosSeleccionados[idx];
+
+    try {
+      const rows = await leerExcel(archivo);
+      if (rows.length < 2) continue;
+
+      // Cabecera del listado (celdas A2 y A3), p.ej.:
+      //   A2: "Encargo: 202412AGE031 RED NATURA 2000 (E24031)"
+      //   A3: "Proyecto/Acción: 10.01.02 Seguimiento de valores naturales 2026"
+      // De ahí se compone el "Encargo / Acción" como "E24031_10.01.02".
+      const filaEncargo = rows[1] ? String(rows[1][0] ?? '') : '';
+      const filaAccion = rows[2] ? String(rows[2][0] ?? '') : '';
+      const codigoEncargo = (filaEncargo.match(/\(([^()]+)\)\s*$/) || [])[1]?.trim() || '';
+      const codigoAccion = (filaAccion.match(/(\d+(?:\.\d+)+)/) || [])[1] || '';
+
+      const encargo = (codigoEncargo && codigoAccion)
+        ? `${codigoEncargo}_${codigoAccion}`
+        : archivo.name.replace(/\.xlsx$/i, ''); // respaldo si no se reconoce la cabecera
+
+      if (!codigoEncargo || !codigoAccion) {
+        log(`[WARN] '${archivo.name}': no se pudo leer Encargo/Acción de A2/A3, se usa el nombre del archivo como respaldo.`, 'warn');
+      } else if (!encargoAccionDetectado) {
+        encargoAccionDetectado = encargo;
+      }
+
+      const colNames = ['Codigo','Nombre','Dia','Total_Trabajado','Fuera_Instalaciones','Tipo_Salida','Fichajes','Total_Facturable','Facturar_1','Facturar_2','Festivos_Pagar','Horas_Extras_Pagar'];
+      const dataRows = rows.slice(1).filter(r => r.some(c => c !== null && c !== undefined && c !== ''));
+
+      let df = dataRows.map(r => {
+        const obj = {};
+        colNames.forEach((col, i) => obj[col] = r[i] !== undefined ? r[i] : null);
+        return obj;
+      });
+
+      df = df.map(row => {
+        const dia = parseFecha(row.Dia);
+        const festivoPagarOriginal = parseFloat(row.Festivos_Pagar) || 0;
+        const horasTrabajadas = parseFloat(row.Total_Trabajado) || 0;
+        const horasFacturables = parseFloat(row.Total_Facturable) || 0;
+        const horasFuera = parseFloat(row.Fuera_Instalaciones) || 0;
+        const trabajo = horasTrabajadas > 0 || horasFacturables > 0 || horasFuera > 0 || (row.Fichajes && String(row.Fichajes).trim() !== '');
+
+        if (!mesDetectado && dia instanceof Date && !isNaN(dia)) {
+          mesDetectado = MESES_ABREV[dia.getMonth()];
+        }
+
+        let festivoDetectado = null;
+        if (trabajo && festivoPagarOriginal === 0) {
+          if (esFestivoNacionalRegional(dia)) festivoDetectado = 'nacional';
+          else if (esFestivoLocal(dia, row.Codigo)) festivoDetectado = 'local';
+        }
+
+        let festivosPagarFinal = festivoPagarOriginal;
+        if (festivoDetectado) festivosPagarFinal = valorFestivoLocal;
+
+        return {
+          ...row,
+          Festivos_Pagar: festivosPagarFinal,
+          Festivo_Detectado_Auto: festivoDetectado,
+          Horas_Extras_Pagar: parseFloat(row.Horas_Extras_Pagar) || 0,
+          Dia: dia
+        };
+      });
+
+      df = df.map(row => {
+        const [mn, mm] = calcularMinutosFila(row.Fichajes, row.Tipo_Salida);
+        const entradaDur = primeraEntradaYDuracion(row.Fichajes);
+        const tipoTurno = entradaDur ? clasificarTurno(entradaDur.entradaMin, entradaDur.duracionHoras, row.Tipo_Salida) : null;
+        return { ...row, Min_Noche: mn, Min_Madrugada: mm, Tipo_Turno: tipoTurno, Entrada_Turno: entradaDur ? entradaDur.entradaMin : null };
+      });
+
+      df.sort((a, b) => (a.Codigo > b.Codigo ? 1 : a.Codigo < b.Codigo ? -1 : 0) || (a.Dia - b.Dia));
+
+      if (metodoNocturnidad === 'cuidadores') {
+        calcularNocturnidadCuidadores(df);
+      } else {
+        calcularNocturnidadProporcional(df);
+      }
+      // En el método de cuidadores el turno se paga en el mes en que termina
+      // (entrada 00:00), así que el límite de mes solo genera avisos, sin restar.
+      ajustarNocturnidadLimiteMes(df, metodoNocturnidad === 'cuidadores');
+      df.filter(r => r.Nota_Nocturnidad).forEach(r => {
+        log(`[AVISO] ${r.Nombre} (${r.Codigo}) ${formatearFecha(r.Dia)}: ${r.Nota_Nocturnidad}`, 'warn');
+      });
+
+      df.forEach(row => {
+        datosFinalesDiarios.push({
+          encargo, codigo: row.Codigo, nombre: row.Nombre, dia: row.Dia,
+          festivo: row.Festivos_Pagar || 0, festivoDetectadoAuto: row.Festivo_Detectado_Auto || null,
+          nocturnidad: row.Plus_Nocturnidad || 0,
+          notaNocturnidad: row.Nota_Nocturnidad || ''
+        });
+      });
+
+      const grupos = {};
+      df.forEach(row => {
+        const key = `${row.Codigo}||${row.Nombre}`;
+        if (!grupos[key]) grupos[key] = { Codigo: row.Codigo, Nombre: row.Nombre, Festivos_Pagar: 0, HE_LV: 0, HE_FS: 0, Plus_Nocturnidad: 0, TiposTurno: new Set(), DiasTurno: {}, JornadasMes: [] };
+        grupos[key].Festivos_Pagar += row.Festivos_Pagar;
+        grupos[key].HE_LV += (row.Dia && row.Dia.getDay() >= 1 && row.Dia.getDay() <= 5) ? row.Horas_Extras_Pagar : 0;
+        grupos[key].HE_FS += (row.Dia && (row.Dia.getDay() === 0 || row.Dia.getDay() === 6)) ? row.Horas_Extras_Pagar : 0;
+        grupos[key].Plus_Nocturnidad += row.Plus_Nocturnidad;
+        if (row.Dia) {
+          grupos[key].JornadasMes.push({
+            dia: row.Dia, fichajes: row.Fichajes, tipoSalida: row.Tipo_Salida, tipo: row.Tipo_Turno
+          });
+        }
+        if (row.Tipo_Turno) {
+          row.Tipo_Turno.forEach(t => {
+            grupos[key].TiposTurno.add(t);
+            // Solo guardamos el primer día encontrado de cada tipo, para el detalle.
+            if (!grupos[key].DiasTurno[t]) grupos[key].DiasTurno[t] = { dia: row.Dia, entradaMin: row.Entrada_Turno };
+          });
+        }
+      });
+
+      Object.values(grupos).forEach(g => {
+        // Turnicidad por contrato: se abona siempre 1 unidad y no pasa por la revisión.
+        const turnicidadContrato = tieneTurnicidadContrato(g.Codigo);
+        const turnicidad = (turnicidadContrato || g.TiposTurno.size >= 2) ? 1 : 0; // unidad (1 = se abona el mes), no el importe en €
+        if (turnicidadContrato) {
+          detalleTurnicidad[`${encargo}||${g.Codigo}`] = 'Incluido por contrato (no depende de los cambios de turno)';
+        } else if (turnicidad > 0) {
+          // Si dos tipos vienen del mismo día+entrada (turno combinado tipo
+          // MT/CMT), se muestran juntos en una sola línea en vez de como si
+          // fueran dos jornadas distintas.
+          const porOcurrencia = {}; // 'fecha|entrada' -> [tipos]
+          [...g.TiposTurno].forEach(t => {
+            const d = g.DiasTurno[t];
+            const clave = `${formatearFecha(d.dia)}|${d.entradaMin}`;
+            if (!porOcurrencia[clave]) porOcurrencia[clave] = { dia: d.dia, entradaMin: d.entradaMin, tipos: [] };
+            porOcurrencia[clave].tipos.push(t);
+          });
+          const detalle = Object.values(porOcurrencia).map(o => {
+            const nombres = o.tipos.sort().map(t => NOMBRE_TIPO_TURNO[t]).join(' + ');
+            return `${nombres}: ${formatearFecha(o.dia)} (entrada ${formatearHora(o.entradaMin)})`;
+          }).join(' · ');
+          detalleTurnicidad[`${encargo}||${g.Codigo}`] = detalle;
+        }
+        if (g.Festivos_Pagar > 0 || g.HE_LV > 0 || g.HE_FS > 0 || g.Plus_Nocturnidad > 0 || turnicidad > 0) {
+          datosFinales.push({
+            'Encargo / Acción': encargo,
+            'Código Trabajador': g.Codigo,
+            'Nombre Trabajador': g.Nombre,
+            'Total Festivos a Pagar': parseFloat(g.Festivos_Pagar.toFixed(2)),
+            'Horas Extras L-V': parseFloat(g.HE_LV.toFixed(2)),
+            'Horas Extras Finde': parseFloat(g.HE_FS.toFixed(2)),
+            'Plus Nocturnidad (Unidades)': g.Plus_Nocturnidad,
+            'Plus Turnicidad (Unidades)': turnicidad
+          });
+          if (turnicidad > 0 && !turnicidadContrato) {
+            candidatosTurnicidad.push({
+              filaIdx: datosFinales.length - 1,
+              encargo, codigo: g.Codigo, nombre: g.Nombre,
+              detalle: detalleTurnicidad[`${encargo}||${g.Codigo}`] || '',
+              jornadas: [...g.JornadasMes].sort((a, b) => a.dia - b.dia),
+              confirmado: true, // pendiente de revisión visual; se aplica por defecto hasta que se desmarque
+              expandido: false
+            });
+          }
+        }
+      });
+
+      log(`[OK] Procesado '${archivo.name}'`, 'ok');
+    } catch(err) {
+      log(`[ERROR] '${archivo.name}': ${err.message}`, 'err');
+    }
+  }
+
+  if (codigosResueltosPorRespaldo.size > 0) {
+    log(`[OK] ${codigosResueltosPorRespaldo.size} código(s) resueltos por el respaldo local (Firestore no los tenía): ${[...codigosResueltosPorRespaldo].join(', ')}`, 'ok');
+  }
+  if (codigosSinLocalidad.size > 0) {
+    log(`[WARN] ${codigosSinLocalidad.size} código(s) sin localidad en Firestore ni en el respaldo local (no se pudo comprobar festivo local): ${[...codigosSinLocalidad].slice(0, 15).join(', ')}${codigosSinLocalidad.size > 15 ? '…' : ''}`, 'warn');
+  }
+  if (localidadesNoReconocidas.size > 0) {
+    log(`[WARN] Localidad(es) sin festivos locales cargados en la app: ${[...localidadesNoReconocidas].join(', ')}. Revisa que el nombre en DATOS PERSONAL coincida con el del calendario oficial (festivos_extremadura_2026.json).`, 'warn');
+  }
+
+  // Nombre de archivo automático: Variables_{Encargo}_{Acción}_{Mes}.xlsx
+  if (encargoAccionDetectado) {
+    const partes = ['Variables', encargoAccionDetectado];
+    if (mesDetectado) partes.push(mesDetectado);
+    document.getElementById('outputName').value = partes.join('_');
+  }
+
+  btnProcess.disabled = false;
+  renderResultados();
+}
+
+function renderRevisionTurnicidad() {
+  const cont = document.getElementById('revisionTurnicidad');
+  if (!cont) return;
+  if (candidatosTurnicidad.length === 0) {
+    cont.style.display = 'none';
+    cont.innerHTML = '';
+    return;
+  }
+  cont.style.display = '';
+  const nConfirmados = candidatosTurnicidad.filter(c => c.confirmado).length;
+
+  function filaJornada(j) {
+    let turno;
+    if (j.tipoSalida && String(j.tipoSalida).trim() !== '') {
+      turno = `<span style="color:var(--text3)">— (salida de trabajo)</span>`;
+    } else if (j.tipo) {
+      turno = j.tipo.map(t => NOMBRE_TIPO_TURNO[t]).join(' + ');
+    } else {
+      turno = `<span style="color:var(--text3)">—</span>`;
+    }
+    return `<tr>
+      <td>${formatearFecha(j.dia)}</td>
+      <td class="mono">${j.fichajes || '—'}</td>
+      <td>${turno}</td>
+    </tr>`;
+  }
+
+  cont.innerHTML = `<div class="revision-turnicidad">
+    <h4><i class="ti ti-alert-triangle" aria-hidden="true"></i> Revisa el Plus Turnicidad detectado (${nConfirmados} de ${candidatosTurnicidad.length} marcados)</h4>
+    <p>Se detecta automáticamente a partir de los fichajes de cada trabajador. Desmarca los que no correspondan de verdad a un cambio de turno antes de descargar — el Excel solo incluirá los que queden marcados.</p>
+    ${candidatosTurnicidad.map((c, idx) => `
+      <div class="revision-item">
+        <input type="checkbox" id="turnicidad_${idx}" ${c.confirmado ? 'checked' : ''} onchange="toggleTurnicidad(${idx}, this.checked)">
+        <label for="turnicidad_${idx}">
+          <div class="revision-nombre">${c.nombre} <span class="mono" style="color:var(--text3);font-size:11px;">(${c.codigo} · ${c.encargo})</span></div>
+          <div class="revision-detalle">${c.detalle}</div>
+          <button type="button" class="btn-expandir-jornadas" onclick="event.preventDefault(); toggleExpandirTurnicidad(${idx})">
+            <i class="ti ti-chevron-${c.expandido ? 'up' : 'down'}" aria-hidden="true"></i>
+            ${c.expandido ? 'Ocultar' : 'Ver todas las'} jornadas del mes (${c.jornadas.length})
+          </button>
+          ${c.expandido ? `
+            <div class="revision-jornadas">
+              <table class="mini-table">
+                <thead><tr><th>Fecha</th><th>Fichaje</th><th>Turno detectado</th></tr></thead>
+                <tbody>${c.jornadas.map(filaJornada).join('')}</tbody>
+              </table>
+            </div>
+          ` : ''}
+        </label>
+      </div>
+    `).join('')}
+  </div>`;
+}
+
+function toggleExpandirTurnicidad(idx) {
+  candidatosTurnicidad[idx].expandido = !candidatosTurnicidad[idx].expandido;
+  renderRevisionTurnicidad();
+}
+
+function toggleTurnicidad(idx, checked) {
+  candidatosTurnicidad[idx].confirmado = checked;
+  datosFinales[candidatosTurnicidad[idx].filaIdx]['Plus Turnicidad (Unidades)'] = checked ? 1 : 0;
+  renderResultados();
+}
+
+function renderResultados() {
+  renderRevisionTurnicidad();
+
+  document.getElementById('statTrabajadores').textContent = new Set(datosFinales.map(r => r['Código Trabajador'])).size;
+  document.getElementById('statFestivos').textContent = datosFinales.reduce((s, r) => s + r['Total Festivos a Pagar'], 0).toFixed(2);
+  document.getElementById('statHE').textContent = datosFinales.reduce((s, r) => s + r['Horas Extras L-V'] + r['Horas Extras Finde'], 0).toFixed(2);
+  document.getElementById('statNocturn').textContent = datosFinales.reduce((s, r) => s + r['Plus Nocturnidad (Unidades)'], 0).toFixed(2);
+  document.getElementById('statFestivosAuto').textContent = datosFinalesDiarios.filter(r => r.festivoDetectadoAuto).length;
+
+  const tableContainer = document.getElementById('tableContainer');
+  const btnDownload = document.getElementById('btnDownload');
+
+  if (datosFinales.length === 0) {
+    tableContainer.innerHTML = `<div class="empty-state"><i class="ti ti-mood-sad"></i><p>No se encontraron datos con variables a pagar.</p></div>`;
+    btnDownload.disabled = true;
+    return;
+  }
+
+  btnDownload.disabled = false;
+  const cols = Object.keys(datosFinales[0]);
+  let html = `<div class="table-wrap"><table><thead><tr>` + cols.map(c => `<th>${c}</th>`).join('') + `</tr></thead><tbody>`;
+
+  datosFinales.forEach(row => {
+    html += `<tr>` + cols.map((col, ci) => {
+      const val = row[col];
+      if (ci === 0) return `<td><span class="badge-encargo">${val}</span></td>`;
+      if (ci === 2) return `<td class="highlight">${val}</td>`;
+      if (col === 'Plus Turnicidad (Unidades)' && val > 0) {
+        const clave = `${row['Encargo / Acción']}||${row['Código Trabajador']}`;
+        const detalle = detalleTurnicidad[clave] || '';
+        return `<td class="num-positive" title="${detalle.replace(/"/g, '&quot;')}" style="cursor: help; text-decoration: underline dotted;">${val}</td>`;
+      }
+      if (ci >= 3) return `<td class="${val > 0 ? 'num-positive' : 'num-zero'}">${typeof val === 'number' ? val.toFixed(ci < 6 ? 2 : 0) : val}</td>`;
+      return `<td class="mono">${val ?? ''}</td>`;
+    }).join('') + `</tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  tableContainer.innerHTML = html;
+}
+
+function construirHojaDetalle() {
+  // Recopilar todos los datos diarios desde datosFinalesDiarios
+  // datosFinalesDiarios: array de { encargo, codigo, nombre, dia(Date), festivo, nocturnidad }
+
+  // Agrupar por encargo+codigo+nombre
+  const grupos = {};
+  datosFinalesDiarios.forEach(r => {
+    const key = `${r.encargo}||${r.codigo}||${r.nombre}`;
+    if (!grupos[key]) grupos[key] = { encargo: r.encargo, codigo: r.codigo, nombre: r.nombre, festivos: {}, nocturnidad: {}, notas: [], anio: null, mes: null };
+    if (r.dia) {
+      const d = r.dia.getDate();
+      if (grupos[key].anio === null) { grupos[key].anio = r.dia.getFullYear(); grupos[key].mes = r.dia.getMonth(); }
+      if (r.festivo > 0) grupos[key].festivos[d] = (grupos[key].festivos[d] || 0) + r.festivo;
+      if (r.nocturnidad > 0) grupos[key].nocturnidad[d] = (grupos[key].nocturnidad[d] || 0) + r.nocturnidad;
+      if (r.notaNocturnidad) grupos[key].notas.push({ dia: d, texto: r.notaNocturnidad });
+    }
+  });
+
+  function diasEnMes(anio, mes) { return new Date(anio, mes + 1, 0).getDate(); }
+
+  // Tipo de día de calendario, independientemente de si hubo pago ese día:
+  // 'nacional' > 'local' > 'finde' > null (laborable normal)
+  function tipoDia(anio, mes, dia, codigo) {
+    if (anio === null || dia > diasEnMes(anio, mes)) return null;
+    const fecha = new Date(anio, mes, dia);
+    if (esFestivoNacionalRegional(fecha)) return 'nacional';
+    if (esFestivoLocal(fecha, codigo)) return 'local';
+    const dow = fecha.getDay();
+    if (dow === 0 || dow === 6) return 'finde';
+    return null;
+  }
+
+  const fechaGen = new Date().toLocaleString('es-ES');
+  const salida = [];
+  const celdasTipoDia = {}; // 'R-C' -> 'nacional' | 'local' | 'finde'
+
+  salida.push(['INFORME DE VARIABLES · DETALLE POR DÍAS']);
+  salida.push([`Generado el ${fechaGen}`]);
+  salida.push([]);
+
+  // Sección Festivos
+  salida.push(['FESTIVOS']);
+  const cabFestivos = ['Encargo', 'Código', 'Trabajador'];
+  for (let i = 1; i <= 31; i++) cabFestivos.push(i);
+  cabFestivos.push('Total Festivos');
+  salida.push(cabFestivos);
+
+  Object.values(grupos).forEach(g => {
+    const totalF = Object.values(g.festivos).reduce((a, b) => a + b, 0);
+    if (totalF === 0) return;
+    const fila = [g.encargo, g.codigo, g.nombre];
+    const filaIdx = salida.length; // fila que ocupará esta entrada dentro de 'salida'
+    for (let i = 1; i <= 31; i++) {
+      fila.push(g.festivos[i] || '');
+      const tipo = tipoDia(g.anio, g.mes, i, g.codigo);
+      if (tipo) celdasTipoDia[`${filaIdx}-${2 + i}`] = tipo;
+    }
+    fila.push(parseFloat(totalF.toFixed(2)));
+    salida.push(fila);
+  });
+
+  salida.push([]);
+  salida.push(['Leyenda: gris = sábado/domingo · rojo = festivo nacional/autonómico · amarillo = festivo local. Los importes en negrita son festivos efectivamente trabajados y pagados.']);
+  salida.push([]);
+
+  const filaTituloNocturn = salida.length;
+  // Sección Nocturnidad
+  salida.push(['PLUS NOCTURNIDAD']);
+  const cabNocturn = ['Encargo', 'Código', 'Trabajador'];
+  for (let i = 1; i <= 31; i++) cabNocturn.push(i);
+  cabNocturn.push('Total Nocturnidades');
+  salida.push(cabNocturn);
+
+  Object.values(grupos).forEach(g => {
+    const totalN = Object.values(g.nocturnidad).reduce((a, b) => a + b, 0);
+    if (totalN === 0) return;
+    const fila = [g.encargo, g.codigo, g.nombre];
+    for (let i = 1; i <= 31; i++) fila.push(g.nocturnidad[i] || '');
+    fila.push(totalN);
+    salida.push(fila);
+  });
+
+  // Notas de nocturnidad (turnos que cruzan el límite de mes)
+  const filasNota = [];
+  const notasNoct = [];
+  Object.values(grupos).forEach(g => g.notas.forEach(n => notasNoct.push(`${g.nombre} (${g.codigo}) · día ${n.dia}: ${n.texto}`)));
+  let filaTituloNotas = -1;
+  if (notasNoct.length) {
+    salida.push([]);
+    filaTituloNotas = salida.length;
+    salida.push(['NOTAS DE NOCTURNIDAD']);
+    notasNoct.forEach(t => { filasNota.push(salida.length); salida.push([t]); });
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(salida);
+
+  // Anchos de columna
+  const cols = [{ wch: 28 }, { wch: 12 }, { wch: 30 }];
+  for (let i = 0; i < 31; i++) cols.push({ wch: 5 });
+  cols.push({ wch: 18 });
+  ws['!cols'] = cols;
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 34 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 34 } }
+  ];
+  filasNota.forEach(r => ws['!merges'].push({ s: { r, c: 0 }, e: { r, c: 34 } }));
+  if (filaTituloNotas >= 0) ws['!merges'].push({ s: { r: filaTituloNotas, c: 0 }, e: { r: filaTituloNotas, c: 34 } });
+
+  const COLOR_NACIONAL = 'C0392B', COLOR_LOCAL = 'FFD966', COLOR_FINDE = 'D9D9D9';
+
+  // Estilos
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let R = range.s.r; R <= range.e.r; ++R) {
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      if (!ws[addr]) continue;
+      const v = ws[addr].v;
+      const esTituloPrincipal = R === 0 || R === 1;
+      const isSectionTitle = (v === 'FESTIVOS' || v === 'PLUS NOCTURNIDAD' || v === 'NOTAS DE NOCTURNIDAD');
+      const esNota = filasNota.includes(R);
+      const isHeaderRow = C >= 3 && C <= 33 && (R === 4 || R === filaTituloNocturn + 1);
+      const isDayCol = C >= 3 && C <= 33;
+      const tieneValor = typeof v === 'number' && v > 0 && isDayCol;
+      const tipo = celdasTipoDia[`${R}-${C}`];
+      const colorFondo = tipo === 'nacional' ? COLOR_NACIONAL : tipo === 'local' ? COLOR_LOCAL : tipo === 'finde' ? COLOR_FINDE : null;
+      const fontBlanco = tipo === 'nacional';
+
+      const style = {
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: 'D9D9D9' } }, bottom: { style: 'thin', color: { rgb: 'D9D9D9' } },
+          left: { style: 'thin', color: { rgb: 'D9D9D9' } }, right: { style: 'thin', color: { rgb: 'D9D9D9' } }
+        }
+      };
+      if (esNota) {
+        style.alignment = { horizontal: 'left', vertical: 'center', wrapText: true };
+        style.font = { color: { rgb: '553C9A' } };
+      } else if (esTituloPrincipal) {
+        style.font = { bold: R === 0, italic: R === 1, sz: R === 0 ? 15 : 10, color: { rgb: R === 0 ? 'FFFFFF' : '64748B' } };
+        if (R === 0) style.fill = { fgColor: { rgb: '1E3A5F' } };
+      } else if (isSectionTitle) {
+        style.font = { bold: true, sz: 12, color: { rgb: 'FFFFFF' } };
+        style.fill = { fgColor: { rgb: '1E2536' } };
+      } else if (isHeaderRow) {
+        style.font = { bold: true, color: { rgb: 'FFFFFF' } };
+        style.fill = { fgColor: { rgb: '2E5C8A' } };
+      } else if (isDayCol && colorFondo) {
+        style.fill = { fgColor: { rgb: colorFondo } };
+        style.font = { bold: !!tieneValor, color: { rgb: fontBlanco ? 'FFFFFF' : '000000' } };
+      } else if (tieneValor && R > filaTituloNocturn) {
+        // Celda de nocturnidad con valor (la sección de nocturnidad no lleva
+        // sombreado de calendario, solo se resalta si tiene unidades).
+        style.fill = { fgColor: { rgb: 'E9D8FD' } };
+        style.font = { bold: true, color: { rgb: '553C9A' } };
+      } else if (tieneValor) {
+        style.font = { bold: true, color: { rgb: '166534' } };
+      }
+      ws[addr].s = style;
+    }
+  }
+
+  return ws;
+}
+
+function construirHojaVariables() {
+  const cols = ['Encargo / Acción', 'Código Trabajador', 'Nombre Trabajador', 'Total Festivos a Pagar', 'Horas Extras L-V', 'Horas Extras Finde', 'Plus Nocturnidad (Unidades)', 'Plus Turnicidad (Unidades)'];
+  const nCols = cols.length;
+  const fecha = new Date().toLocaleString('es-ES');
+
+  const salida = [];
+  salida.push(['INFORME DE VARIABLES LABORALES']);
+  salida.push([`Generado el ${fecha}  ·  ${datosFinales.length} registro(s)`]);
+  salida.push([]);
+  const filaHeader = salida.length;
+  salida.push(cols);
+  const filaPrimerDato = salida.length;
+  datosFinales.forEach(r => salida.push(cols.map(c => r[c])));
+
+  const ws = XLSX.utils.aoa_to_sheet(salida);
+  ws['!cols'] = [
+    { wch: 28 }, { wch: 18 }, { wch: 30 },
+    { wch: 22 }, { wch: 18 }, { wch: 18 }, { wch: 26 }, { wch: 18 }
+  ];
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: nCols - 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: nCols - 1 } }
+  ];
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: filaHeader, c: 0 }, e: { r: filaHeader, c: nCols - 1 } }) };
+
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let R = range.s.r; R <= range.e.r; ++R) {
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      if (!ws[addr]) continue;
+      const esTitulo = R === 0;
+      const esSubtitulo = R === 1;
+      const esHeader = R === filaHeader;
+      const esDato = R >= filaPrimerDato;
+      const esNumerica = esDato && C >= 3;
+
+      const style = {
+        alignment: { horizontal: (C === 2 ? 'left' : (esTitulo || esSubtitulo ? 'left' : 'center')), vertical: 'center' }
+      };
+      if (esTitulo) {
+        style.font = { bold: true, sz: 15, color: { rgb: 'FFFFFF' } };
+        style.fill = { fgColor: { rgb: '1E3A5F' } };
+      } else if (esSubtitulo) {
+        style.font = { italic: true, sz: 10, color: { rgb: '64748B' } };
+      } else if (esHeader) {
+        style.font = { bold: true, sz: 11, color: { rgb: 'FFFFFF' } };
+        style.fill = { fgColor: { rgb: '2E5C8A' } };
+        style.border = { top: { style: 'thin', color: { rgb: 'FFFFFF' } }, bottom: { style: 'thin', color: { rgb: 'FFFFFF' } }, left: { style: 'thin', color: { rgb: 'FFFFFF' } }, right: { style: 'thin', color: { rgb: 'FFFFFF' } } };
+      } else if (esDato) {
+        style.fill = { fgColor: { rgb: (R - filaPrimerDato) % 2 === 0 ? 'FFFFFF' : 'F1F5F9' } };
+        style.border = { top: { style: 'thin', color: { rgb: 'D9D9D9' } }, bottom: { style: 'thin', color: { rgb: 'D9D9D9' } }, left: { style: 'thin', color: { rgb: 'D9D9D9' } }, right: { style: 'thin', color: { rgb: 'D9D9D9' } } };
+        if (esNumerica) { style.numFmt = '0.00'; if ((ws[addr].v || 0) > 0) style.font = { bold: true, color: { rgb: '166534' } }; }
+      }
+      ws[addr].s = style;
+    }
+  }
+
+  return ws;
+}
+
+function descargarExcel() {
+  if (datosFinales.length === 0) return;
+  const wb = XLSX.utils.book_new();
+
+  // Hoja 1: Variables (resumen, con formato)
+  const ws1 = construirHojaVariables();
+  XLSX.utils.book_append_sheet(wb, ws1, 'Variables');
+
+  // Hoja 2: Detalle por días (calendario de festivos coloreado)
+  if (datosFinalesDiarios.length > 0) {
+    const ws2 = construirHojaDetalle();
+    XLSX.utils.book_append_sheet(wb, ws2, 'Detalle Días');
+  }
+
+  const nombre = document.getElementById('outputName').value.trim() || 'variables_final_laboral';
+  const nombreFinal = nombre.endsWith('.xlsx') ? nombre : nombre + '.xlsx';
+  XLSX.writeFile(wb, nombreFinal);
+}
+
+// ============================================================
+// MÓDULO "LABORAL"
+// ============================================================
+
+function logEn(elementId, msg, tipo = 'info') {
+  const el = document.getElementById(elementId);
+  el.classList.add('visible');
+  const line = document.createElement('div');
+  line.className = `log-line ${tipo}`;
+  line.textContent = msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+const dropZoneLaboral = document.getElementById('dropZoneLaboral');
+const fileInputLaboral = document.getElementById('fileInputLaboral');
+const fileListLaboral = document.getElementById('fileListLaboral');
+const btnCargarLaboral = document.getElementById('btnCargarLaboral');
+
+dropZoneLaboral.addEventListener('dragover', e => { e.preventDefault(); dropZoneLaboral.classList.add('drag-over'); });
+dropZoneLaboral.addEventListener('dragleave', () => dropZoneLaboral.classList.remove('drag-over'));
+dropZoneLaboral.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZoneLaboral.classList.remove('drag-over');
+  agregarArchivosLaboral([...e.dataTransfer.files].filter(f => f.name.endsWith('.xlsx')));
+});
+fileInputLaboral.addEventListener('change', () => {
+  agregarArchivosLaboral([...fileInputLaboral.files]);
+  fileInputLaboral.value = '';
+});
+
+function agregarArchivosLaboral(nuevos) {
+  nuevos.forEach(f => {
+    if (!archivosLaboral.find(a => a.name === f.name)) archivosLaboral.push(f);
+  });
+  renderFileListLaboral();
+}
+
+function quitarArchivoLaboral(idx) {
+  archivosLaboral.splice(idx, 1);
+  renderFileListLaboral();
+}
+
+function renderFileListLaboral() {
+  fileListLaboral.innerHTML = '';
+  archivosLaboral.forEach((f, idx) => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.innerHTML = `<i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
+      <span class="file-name">${f.name}</span>
+      <button class="file-remove" title="Quitar" onclick="quitarArchivoLaboral(${idx})">
+        <i class="ti ti-x" style="font-size:14px" aria-hidden="true"></i>
+      </button>`;
+    fileListLaboral.appendChild(item);
+  });
+  btnCargarLaboral.disabled = archivosLaboral.length === 0;
+}
+
+function cambiarAreaGlobalLaboral() {
+  // El área es única por informe (una sola vez en la cabecera del Excel de
+  // destino), así que al cambiarla se aplica a todas las filas ya cargadas.
+  const [areaNombre] = document.getElementById('laboralArea').value.split('|');
+  filasLaboral.forEach(fila => { fila.area = areaNombre; });
+}
+
+function normalizarCodigoLaboral(cod) {
+  const limpio = normalizarCodigo(cod);
+  // El formato de Laboral usa el código con 6 dígitos y ceros a la izquierda
+  // (p.ej. "001536"); si no es puramente numérico, se deja tal cual.
+  return /^\d+$/.test(limpio) ? limpio.padStart(6, '0') : limpio;
+}
+
+async function cargarVariablesLaboral() {
+  if (archivosLaboral.length === 0) return;
+  document.getElementById('logAreaLaboral').innerHTML = '';
+  btnCargarLaboral.disabled = true;
+
+  const [areaNombreDefecto] = document.getElementById('laboralArea').value.split('|');
+
+  // Mapa código -> totales auto recalculados desde cero en cada carga
+  const totalesAuto = {}; // { codigo: { nombre, festivoJornada, nocturnidadJornada, heLV, heFinde } }
+  let archivosOk = 0;
+
+  for (const archivo of archivosLaboral) {
+    try {
+      const rows = await leerExcel(archivo);
+      const idxHeader = rows.findIndex(r => r && r[1] === 'Código Trabajador');
+      if (idxHeader === -1) {
+        logEn('logAreaLaboral', `[ERROR] '${archivo.name}': no tiene el formato esperado (hoja "Variables" de este procesador).`, 'err');
+        continue;
+      }
+      for (let r = idxHeader + 1; r < rows.length; r++) {
+        const fila = rows[r];
+        if (!fila || fila.every(c => c === null || c === undefined || c === '')) continue;
+        const codigoRaw = fila[1];
+        const cod = normalizarCodigoLaboral(codigoRaw);
+        if (!cod) continue;
+        if (!totalesAuto[cod]) {
+          totalesAuto[cod] = { nombre: fila[2] || '', festivoJornada: 0, nocturnidadJornada: 0, heLV: 0, heFinde: 0, turnicidad: 0 };
+        }
+        totalesAuto[cod].festivoJornada += parseFloat(fila[3]) || 0;
+        totalesAuto[cod].heLV += parseFloat(fila[4]) || 0;
+        totalesAuto[cod].heFinde += parseFloat(fila[5]) || 0;
+        totalesAuto[cod].nocturnidadJornada += parseFloat(fila[6]) || 0;
+        // Importe fijo mensual: si aparece en cualquiera de los archivos
+        // cargados, se aplica una sola vez (no se suma por archivo).
+        totalesAuto[cod].turnicidad = Math.max(totalesAuto[cod].turnicidad, parseFloat(fila[7]) || 0);
+      }
+      archivosOk++;
+      logEn('logAreaLaboral', `[OK] Leído '${archivo.name}'`, 'ok');
+    } catch (err) {
+      logEn('logAreaLaboral', `[ERROR] '${archivo.name}': ${err.message}`, 'err');
+    }
+  }
+
+  // Trabajadores con complementos por contrato: se añaden aunque no vengan en los archivos.
+  if (document.getElementById('laboralIncluirContrato')?.checked) {
+    const añadidos = [];
+    [...contratos.peligrosidad, ...contratos.turnicidad].forEach(c => {
+      const cod = normalizarCodigoLaboral(c.cod);
+      if (cod && !totalesAuto[cod]) {
+        totalesAuto[cod] = { nombre: c.nombre || '', festivoJornada: 0, nocturnidadJornada: 0, heLV: 0, heFinde: 0, turnicidad: 0 };
+        añadidos.push(cod);
+      }
+    });
+    if (añadidos.length > 0) {
+      logEn('logAreaLaboral', `[OK] ${añadidos.length} trabajador(es) añadidos por complemento de contrato: ${añadidos.join(', ')}`, 'ok');
+    }
+  }
+
+  // Fusiona con filasLaboral existente: conserva los campos manuales de
+  // códigos ya presentes, recalcula solo los campos auto, y añade filas
+  // nuevas para códigos que no existían todavía.
+  const existentes = new Map(filasLaboral.map(f => [f.codigo, f]));
+  const nuevasFilas = [];
+  Object.keys(totalesAuto).sort().forEach(cod => {
+    const t = totalesAuto[cod];
+    const prev = existentes.get(cod);
+    const base = prev || {
+      codigo: cod, trabajadorNuevo: '', area: areaNombreDefecto, observaciones: '',
+      festivoMes: '', turnicidad: '', peligrosidad: '', jornadaPartidaJornada: '', jornadaPartidaMes: '',
+      nocturnidadMes: '', guardias1Semana: '', guardias1Dia: '', guardias2Semana: '', guardias2Dia: '',
+      heFuerzaLV: '', heFuerzaFinde: '', kilometraje: '', dietasExentas: '', dietasSujetas: ''
+    };
+    base.nombre = t.nombre || base.nombre;
+    base.festivoJornada = parseFloat(t.festivoJornada.toFixed(2));
+    base.nocturnidadJornada = parseFloat(t.nocturnidadJornada.toFixed(2));
+    base.heLV = parseFloat(t.heLV.toFixed(2));
+    base.heFinde = parseFloat(t.heFinde.toFixed(2));
+    base.turnicidad = (t.turnicidad > 0 || tieneTurnicidadContrato(cod)) ? Math.max(1, parseFloat(t.turnicidad.toFixed(2))) : '';
+    if (tienePeligrosidadContrato(cod)) base.peligrosidad = 1;
+    nuevasFilas.push(base);
+  });
+  filasLaboral = nuevasFilas;
+
+  document.getElementById('statTrabajadoresLaboral').textContent = filasLaboral.length;
+  document.getElementById('statArchivosLaboral').textContent = archivosOk;
+
+  // Nombre de archivo sugerido
+  const [, areaCodigo] = document.getElementById('laboralArea').value.split('|');
+  const mes = document.getElementById('laboralMes').value;
+  const anio = document.getElementById('laboralAnio').value;
+  if (areaCodigo) {
+    document.getElementById('outputNameLaboral').value = ['VARIABLES_LABORAL', areaCodigo, mes, anio].filter(Boolean).join('_');
+  }
+
+  // Sin tabla en pantalla: solo una confirmación breve con lo cargado.
+  const cont = document.getElementById('tableContainerLaboral');
+  const btnDownload = document.getElementById('btnDownloadLaboral');
+  if (filasLaboral.length > 0) {
+    cont.innerHTML = `<div class="empty-state"><i class="ti ti-circle-check" style="color: var(--success)"></i>
+      <p>${filasLaboral.length} trabajador(es) listos a partir de ${archivosOk} archivo(s). Pulsa <strong>Descargar xlsx</strong> para generar el informe.</p></div>`;
+    btnDownload.disabled = false;
+  } else {
+    cont.innerHTML = `<div class="empty-state"><i class="ti ti-table-off"></i><p>No se ha podido leer ningún trabajador de los archivos subidos.</p></div>`;
+    btnDownload.disabled = true;
+  }
+
+  btnCargarLaboral.disabled = false;
+}
+
+// --- Construcción del Excel de salida, replicando el formato del modelo ---
+
+// Colores y estilos extraídos directamente de VARIABLES_LABORAL.xlsx (modelo)
+const LAB_COLOR_GRUPO = 'FF99CCFF';   // fondo de la fila 3 (nombres de variable)
+const LAB_COLOR_TARIFA = 'FFCCFFFF'; // fondo de la fila 4 (tarifas en €)
+const LAB_COLOR_AREA = 'FFD9D9D9';   // fondo de la celda de Área en fila 2
+const LAB_BORDE_GRUPO = { style: 'medium', color: { rgb: 'FF000000' } };
+const LAB_BORDE_TARIFA = { style: 'thin', color: { rgb: 'FF000000' } };
+const LAB_BORDE_DATO = { style: 'thin', color: { rgb: 'FF000000' } };
+
+// Anchos de columna (wch = caracteres) tomados del modelo; las columnas sin
+// ancho explícito en el original (H en adelante) usan un ancho legible.
+const LAB_ANCHOS = [20, 49, 43, 55, 19, 24, 23, 20, 20, 20, 20, 20, 20, 20, 18, 20, 18, 18, 20, 20, 20, 22, 22, 22];
+
+// Etiquetas de las filas 3 y 4 (grupo de variable + tarifa), en el mismo
+// orden que COLUMNAS_LABORAL a partir de 'festivoJornada' (columna F).
+const LAB_GRUPOS_TARIFAS = [
+  { grupo: 'Plus fin de semana/festivo (jornada)', tarifa: '44,56 €/día' },
+  { grupo: 'Plus fin de semana/festivo (mes)', tarifa: '389,86 €/mes' },
+  { grupo: 'Plus turnicidad', tarifa: '66,82 €/mes' },
+  { grupo: 'Peligrosidad/toxicidad', tarifa: '133,68 €/mes' },
+  { grupo: 'Jornada partida (jornada)', tarifa: '5,39 €/día' },
+  { grupo: 'Jornada partida (mes)', tarifa: '77,97 € / mes' },
+  { grupo: 'Plus de nocturnidad (jornada)', tarifa: '13,36 € / día' },
+  { grupo: 'Plus de nocturnidad\n(mes)', tarifa: '389,86 €/mes' },
+  { grupo: 'Disponibilidad Guardias 1 (semana)', tarifa: '155,94 € / semana' },
+  { grupo: 'Disponibilidad Guardias 1 (día)', tarifa: '22,27 € / día ' },
+  { grupo: 'Disponibilidad Guardias 2 (semana)', tarifa: '93,56 € / semana' },
+  { grupo: 'Disponibilidad Guardias 2 (día)', tarifa: '13,36 € / día' },
+  { grupo: 'Horas extras (L-V)', tarifa: null },
+  { grupo: 'Horas extras (Fin de semana)', tarifa: null },
+  { grupo: 'Horas extras fuerza mayor(L-V)', tarifa: null },
+  { grupo: 'Horas extras fuerza mayor (Fin de semana)', tarifa: null },
+  { grupo: 'Kilometraje \n(no registrado en el SOI)', tarifa: null },
+  { grupo: 'Dietas  exentas\n(no registrado en el SOI)', tarifa: null },
+  { grupo: 'Dietas  sujetas\n(no registrado en el SOI)', tarifa: null }
+];
+
+function construirHojaLaboral() {
+  const areaSel = document.getElementById('laboralArea').value.split('|');
+  const areaNombre = areaSel[0] || '';
+  const areaCodigo = areaSel[1] || '';
+  const anio = document.getElementById('laboralAnio').value || '';
+  const mes = document.getElementById('laboralMes').value || '';
+
+  const salida = [];
+  salida.push(['AÑO', 'MES', 'ÁREA', null, 'V2024.04']);
+  salida.push([anio, mes, areaNombre, areaCodigo]);
+  salida.push([null, null, null, null, null, ...LAB_GRUPOS_TARIFAS.map(g => g.grupo)]);
+  salida.push(['Código trabajador', 'Nombre trabajador', 'Trabajador nuevo', 'Área', 'Observaciones',
+    ...LAB_GRUPOS_TARIFAS.map(g => g.tarifa)]);
+
+  filasLaboral.forEach(fila => {
+    salida.push([
+      fila.codigo, fila.nombre, fila.trabajadorNuevo || null, fila.area || areaNombre, fila.observaciones || null,
+      fila.festivoJornada || null, fila.festivoMes || null, fila.turnicidad || null, fila.peligrosidad || null,
+      fila.jornadaPartidaJornada || null, fila.jornadaPartidaMes || null,
+      fila.nocturnidadJornada || null, fila.nocturnidadMes || null,
+      fila.guardias1Semana || null, fila.guardias1Dia || null, fila.guardias2Semana || null, fila.guardias2Dia || null,
+      fila.heLV || null, fila.heFinde || null, fila.heFuerzaLV || null, fila.heFuerzaFinde || null,
+      fila.kilometraje || null, fila.dietasExentas || null, fila.dietasSujetas || null
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(salida);
+  const nCols = 24; // A..X
+  const filaDatosDesde = 4; // 0-indexado: fila 5 en Excel
+
+  ws['!cols'] = LAB_ANCHOS.map(w => ({ wch: w }));
+  ws['!rows'] = [{}, { hpt: 15.75 }, { hpt: 42 }, { hpt: 18.75 }];
+
+  const range = { s: { r: 0, c: 0 }, e: { r: salida.length - 1, c: nCols - 1 } };
+  for (let R = range.s.r; R <= range.e.r; ++R) {
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+      let style = {};
+
+      if (R === 0) {
+        // Fila 1: etiquetas AÑO / MES / ÁREA en negrita
+        if (C <= 2) style.font = { bold: true, sz: 11 };
+      } else if (R === 1) {
+        // Fila 2: valores. La celda de Área lleva fondo gris.
+        if (C === 2) style.fill = { fgColor: { rgb: LAB_COLOR_AREA } };
+      } else if (R === 2) {
+        // Fila 3: nombres de variable (columna F en adelante)
+        if (C >= 5) {
+          style = {
+            font: { bold: true, sz: 11 },
+            fill: { fgColor: { rgb: LAB_COLOR_GRUPO } },
+            alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+            border: { top: LAB_BORDE_GRUPO, bottom: LAB_BORDE_GRUPO, left: LAB_BORDE_GRUPO, right: LAB_BORDE_GRUPO }
+          };
+        }
+      } else if (R === 3) {
+        // Fila 4: cabeceras A-E en negrita; tarifas F-Q con fondo cian
+        if (C <= 4) {
+          style = { font: { bold: true, sz: 11 }, alignment: { horizontal: 'center', vertical: 'center' } };
+        } else if (ws[addr].v) {
+          style = {
+            font: { bold: true, sz: 9 },
+            fill: { fgColor: { rgb: LAB_COLOR_TARIFA } },
+            alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+            border: { left: LAB_BORDE_TARIFA, right: LAB_BORDE_TARIFA }
+          };
+        }
+      } else if (R >= filaDatosDesde) {
+        // Filas de datos: borde fino en todo, formato numérico en F..X
+        style = {
+          border: { top: LAB_BORDE_DATO, bottom: LAB_BORDE_DATO, left: LAB_BORDE_DATO, right: LAB_BORDE_DATO }
+        };
+        if (C >= 5) style.numFmt = '0.00';
+      }
+
+      ws[addr].s = style;
+    }
+  }
+
+  return ws;
+}
+
+function descargarInformeLaboral() {
+  if (filasLaboral.length === 0) return;
+  const wb = XLSX.utils.book_new();
+  const ws = construirHojaLaboral();
+  XLSX.utils.book_append_sheet(wb, ws, 'VARIABLES');
+
+  const nombre = document.getElementById('outputNameLaboral').value.trim() || 'VARIABLES_LABORAL';
+  const nombreFinal = nombre.endsWith('.xlsx') ? nombre : nombre + '.xlsx';
+  XLSX.writeFile(wb, nombreFinal);
+}
+</script>
+</body>
+</html>

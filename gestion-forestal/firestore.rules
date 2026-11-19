@@ -248,6 +248,14 @@ service cloud.firestore {
       allow create, update: if request.resource.data.size() <= 200;
     }
 
+    // CÁLCULO DE VARIABLES: listas de plus por contrato (peligrosidad y turnicidad), compartidas.
+    match /cv_config/{id} {
+      allow read: if true;
+      allow write: if id == 'contratos'
+        && request.resource.data.peligrosidad is list
+        && request.resource.data.turnicidad is list;
+    }
+
     // Cualquier otra colección queda cerrada.
   }
 }
