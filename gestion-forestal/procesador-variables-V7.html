@@ -1415,11 +1415,11 @@ try {
 
 // ---- Bajas y excedencias (registro «Altas/Bajas» de Gestión Forestal) ----
 // Colección gf_movimientos del proyecto cuadrante-secona. Cada documento es
-// una baja (tipo 'baja', con motivo it / exc_incomp / exc_interes / voluntaria)
+// una baja (tipo 'baja', con motivo it / maternidad / lactancia / exc_incomp / exc_interes / voluntaria)
 // o un alta (tipo 'alta'), con su fecha (AAAA-MM-DD). Una baja sigue abierta
 // hasta que la misma persona tiene un alta posterior.
 const MOTIVOS_BAJA = {
-  it: 'Baja IT', exc_incomp: 'Excedencia por incompatibilidad',
+  it: 'Baja IT', maternidad: 'Baja por maternidad/paternidad', lactancia: 'Permiso de lactancia', exc_incomp: 'Excedencia por incompatibilidad',
   exc_interes: 'Excedencia por interés particular', voluntaria: 'Baja voluntaria'
 };
 let movimientosBajas = [];

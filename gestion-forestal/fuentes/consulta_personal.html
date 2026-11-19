@@ -249,7 +249,7 @@ const dash='<span class="dash">—</span>';
 /* Interinos (contrato 410 u obs. INT) y sustitutos: Puesto G.E., código y nombre en azul */
 const esSus=r=>/^410/.test(String(r.contrato||''))||String(r.obs||'').toUpperCase()==='INT'||r.rolEf==='sustituto'||r.rol==='sustituto'||/sustitut/i.test(String((r._doc||{}).shared||''));
 /* Tipos de baja del registro «Altas/Bajas» */
-const BAJAS={it:['IT','Baja por enfermedad (IT)'],exc_incomp:['Excedencia','Excedencia por incompatibilidad'],exc_interes:['Excedencia','Excedencia por interés particular'],voluntaria:['Baja voluntaria','Baja voluntaria']};
+const BAJAS={it:['IT','Baja por enfermedad (IT)'],maternidad:['Maternidad/paternidad','Baja por maternidad/paternidad'],lactancia:['Lactancia','Permiso de lactancia'],exc_incomp:['Excedencia','Excedencia por incompatibilidad'],exc_interes:['Excedencia','Excedencia por interés particular'],voluntaria:['Baja voluntaria','Baja voluntaria']};
 const pillCls=v=>titulo(String(v||'').trim().split(/\s+/)[0]||'');
 const val=v=>(v===''||v==null)?dash:esc(v);
 const pad2=n=>String(n).padStart(2,'0');

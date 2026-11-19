@@ -695,7 +695,7 @@ async function arrancarApp(){
 
 /* --- Bajas y excedencias en curso (registro «Altas/Bajas» de Gestión Forestal) --- */
 let gfMovimientos = [];
-const MOTIVOS_BAJA = { it:'Baja IT', exc_incomp:'Excedencia por incompatibilidad', exc_interes:'Excedencia por interés particular', voluntaria:'Baja voluntaria' };
+const MOTIVOS_BAJA = { it:'Baja IT', maternidad:'Baja por maternidad/paternidad', lactancia:'Permiso de lactancia', exc_incomp:'Excedencia por incompatibilidad', exc_interes:'Excedencia por interés particular', voluntaria:'Baja voluntaria' };
 const sinAcentos = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
 // Misma clave de persona que usa Gestión Forestal: código de empleado sin ceros, o nombre + puesto
 function clavePersona(p){
