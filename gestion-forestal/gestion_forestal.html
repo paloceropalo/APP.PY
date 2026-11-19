@@ -702,10 +702,10 @@ function itActive(exceptId){
 const personLabel=p=>[p.emp,p.name,p.puesto].filter(Boolean).join(' · ');
 // Otra persona con el mismo PUESTO G.E. en Personal adscrito (sustituto probable)
 function coverGuess(w){ const pu=String(w?.puesto||'').trim().toUpperCase(), k=w?(w.pkey||personKey(w)):''; if(!pu) return null;
- return data.staff.find(x=>String(x.puesto||'').trim().toUpperCase()===pu&&personKey(x)!==k)||null; }
+ return data.staff.find(x=>String(x.puesto||'').trim().toUpperCase()===pu&&personKey(x)!==k&&!isVacant(x))||null; }
 function coverText(m){
  if(m.tipo!=='baja') return {t:'',cls:''};
- if(m.cobertura==='vacante') return {t:esTemporal(m)?'Baja (sin cubrir)':'Vacante (sin cubrir)',cls:'cov-vac'};
+ if(m.cobertura==='vacante'){ const g=coverGuess(m); return g?{t:'Sustituido por '+g.name,cls:'cov-sus cov-guess'}:{t:esTemporal(m)?'Baja (sin cubrir)':'Vacante (sin cubrir)',cls:'cov-vac'}; }
  if(m.cobertura==='sustituido') return {t:'Sustituido por '+(m.sustituto||'—'),cls:'cov-sus'};
  const g=coverGuess(m); return g?{t:'Sustituido por '+g.name,cls:'cov-sus cov-guess'}:esTemporal(m)?{t:'Sin indicar',cls:'cov-none'}:{t:'Vacante (sin cubrir)',cls:'cov-vac cov-guess'};
 }
@@ -766,6 +766,7 @@ function vacantPuestos(jobId,group){
   const lv=leaveVacancy(p,act);
   if(isVacant(p)){ seen.add(pu); out.push({puesto:pu,src:p,placeholder:true,label:pu+' · '+(p.name||'Vacante')}); }
   else if(lv){ seen.add(pu); out.push({puesto:pu,src:p,placeholder:false,label:pu+' · '+BAJA_MOTIVOS[motivoDe(lv)]+' de '+(p.name||'')+' (sin sustituto)'}); }
+  else { const b=act.get(personKey(p)); if(b&&b.cobertura!=='sustituido'&&!coverGuess(b)){ seen.add(pu); out.push({puesto:pu,src:p,placeholder:false,label:pu+' · '+BAJA_MOTIVOS[motivoDe(b)]+' de '+(p.name||'')+' (sin sustituto)'}); } }
  }
  return out.sort((a,b)=>a.puesto.localeCompare(b.puesto,'es',{numeric:true}));
 }
@@ -1030,6 +1031,7 @@ byId('form').onsubmit=async event=>{
   }
   values.actions.sort(byAction);
  }
+ const empAntes=String(editing?.emp||'').trim();
  if(formMode==='staff'&&!editing){
   if(values.puesto==='__new') values.puesto=String(values.puestoNuevo||'').trim().toUpperCase();
   else if(/^\d+$/.test(values.puesto||'')){ const o=vacantPuestos(values.job,values.actionGroup)[+values.puesto]; values.puesto=o?o.puesto:''; }
@@ -1047,11 +1049,15 @@ byId('form').onsubmit=async event=>{
  const btn=byId('form').querySelector('button.primary');btn.disabled=true;
  const ok=await saveRecord(formMode,record);
  // Si cubre el puesto de alguien en excedencia o baja voluntaria, su movimiento pasa a «Sustituido por»
- if(ok&&formMode==='staff'&&vacLeave&&String(vacLeave.puesto||'').trim().toUpperCase()===String(record.puesto||'').trim().toUpperCase()){
-  const mv=itActive().get(personKey(vacLeave));
-  if(mv) await saveRecord('moves',{...mv,cobertura:'sustituido',sustituto:String(record.name||''),sustitutoEmp:String(record.emp||''),actualizado:new Date().toISOString()});
-  vacLeave=null;
+ // (también bajas IT, maternidad/paternidad y lactancia: cualquier baja en curso del mismo puesto sin sustituto)
+ if(ok&&formMode==='staff'&&!isVacant(record)&&String(record.emp||'').trim()!==empAntes){
+  const pu=String(record.puesto||'').trim().toUpperCase(), kRec=personKey(record);
+  for(const [k,mv] of itActive()){
+   if(k!==kRec&&mv.cobertura!=='sustituido'&&String(mv.puesto||'').trim().toUpperCase()===pu)
+    await saveRecord('moves',{...mv,cobertura:'sustituido',sustituto:String(record.name||''),sustitutoEmp:String(record.emp||''),actualizado:new Date().toISOString()});
+  }
  }
+ vacLeave=null;
  btn.disabled=false;
  if(!ok) return error('No se pudieron guardar los cambios.');
  byId('editor').close();byId('search').value='';show();

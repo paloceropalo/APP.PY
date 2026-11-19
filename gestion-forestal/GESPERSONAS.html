@@ -689,7 +689,7 @@ async function arrancarApp(){
   }, err=>{ console.error(err); toast('Error leyendo PERSONAL ADSCRITO de Gestión Forestal.', 'error'); });
   // Altas/Bajas de Gestión Forestal: para saber qué puestos tienen al ocupante de baja o excedencia
   db.collection('gf_movimientos').onSnapshot(snap=>{
-    gfMovimientos = snap.docs.map(d=>d.data()); recalcular();
+    gfMovimientos = snap.docs.map(d=>({ ...d.data(), _docId: d.id })); recalcular();
   }, err=>{ console.error(err); toast('Error leyendo el registro de Altas/Bajas de Gestión Forestal.', 'error'); });
 }
 
@@ -710,6 +710,23 @@ function bajasActivas(movs){
   return m;
 }
 const fechaDMY = iso => { const [a,m,d] = String(iso||'').split('-'); return d ? `${d}/${m}/${a}` : String(iso||''); };
+// Ficha cerrada con trabajador y fecha de alta: si el puesto tiene una baja en curso sin sustituto,
+// en el registro de Altas/Bajas pasa a «Sustituido por <trabajador>».
+async function marcarSustitucion(ficha){
+  const puesto = String(ficha.puestoGE||'').trim().toUpperCase();
+  const trabajador = String(ficha.trabajador||'').trim();
+  const alta = parseFecha(ficha.fechaAlta);
+  if(!puesto || !trabajador || !alta) return;
+  for(const mv of bajasActivas(gfMovimientos).values()){
+    if(String(mv.puesto||'').trim().toUpperCase() !== puesto || mv.cobertura === 'sustituido') continue;
+    const desde = parseFecha(mv.fecha);
+    if(desde && alta < new Date(desde.getFullYear(), desde.getMonth(), desde.getDate())) continue; // alta anterior a la baja: no la cubre
+    try{
+      await db.collection('gf_movimientos').doc(mv._docId).update({ id: mv._docId, cobertura:'sustituido', sustituto: trabajador, actualizado: new Date().toISOString() });
+      toast(`Altas/Bajas: el puesto de ${mv.name} queda «Sustituido por ${trabajador}».`);
+    }catch(err){ console.error(err); toast('No se pudo anotar la sustitución en Altas/Bajas: ' + err.message, 'error'); }
+  }
+}
 const textoBaja = mv => (MOTIVOS_BAJA[mv.motivo] || MOTIVOS_BAJA.it) + ' desde ' + fechaDMY(mv.fecha);
 
 function refreshCentroOptions(){
@@ -838,6 +855,7 @@ async function guardarCampoFicha(cell){
   try{
     await db.collection(COL_FICHAS).doc(f.id).update(cambios);
     toast('Campo actualizado.');
+    if(field === 'trabajador' || field === 'fechaAlta' || field === 'puestoGE') marcarSustitucion({ ...f, ...cambios });
   }catch(err){
     toast('Error al guardar: ' + err.message, 'error');
     if(typeof cell.getOldValue === 'function') cell.setValue(cell.getOldValue(), true);
@@ -1505,6 +1523,7 @@ document.getElementById('btn-guardar-ficha').addEventListener('click', async ()=
 
     toast('Ficha guardada correctamente.');
     cerrarModalFicha();
+    marcarSustitucion(data);
   }catch(err){
     console.error(err);
     toast('Error al guardar: ' + err.message, 'error');
