@@ -412,7 +412,11 @@ const editado=r=>r.orig&&Object.keys(r.orig).length>0;
 function rebuild(){
   closePop();
   const IT=itMap();
-  ALL=BASE.map(r=>{ const b=IT.get(personKey(r._doc||{})); return {...r,it:b?{desde:b.fecha,notas:txt(b.notes),motivo:BAJAS[b.motivo]?b.motivo:'it'}:null,plaza:!/^\d+$/.test(String(r.cod||'').trim()),vacMotivo:txt((r._doc||{}).vacMotivo)}; });
+  // Excedencias y bajas voluntarias con el puesto ya cubierto no se muestran (siguen en Altas/Bajas hasta su alta)
+  const TEMPORALES=['it','maternidad','lactancia'];
+  const conCodigo=r=>/^\d+$/.test(String(r.cod||'').trim());
+  const cubierto=(r,b)=>b.cobertura==='sustituido'||BASE.some(o=>o!==r&&conCodigo(o)&&o.puestoGE.toUpperCase()===r.puestoGE.toUpperCase()&&!IT.get(personKey(o._doc||{})));
+  ALL=BASE.filter(r=>{ const b=IT.get(personKey(r._doc||{})); return !(b&&!TEMPORALES.includes(BAJAS[b.motivo]?b.motivo:'it')&&cubierto(r,b)); }).map(r=>{ const b=IT.get(personKey(r._doc||{})); return {...r,it:b?{desde:b.fecha,notas:txt(b.notes),motivo:BAJAS[b.motivo]?b.motivo:'it'}:null,plaza:!/^\d+$/.test(String(r.cod||'').trim()),vacMotivo:txt((r._doc||{}).vacMotivo)}; });
   RESPS=[...new Set(BASE.map(r=>r.resp).filter(Boolean))].sort(coll.compare);
   $('#segResp').innerHTML='<button type="button" data-resp="">Todos</button>'+RESPS.map(k=>`<button type="button" data-resp="${esc(k)}">${esc(k)}</button>`).join('');
   if(S.resp&&!RESPS.includes(S.resp))S.resp='';
