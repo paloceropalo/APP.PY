@@ -270,7 +270,7 @@
     <section id="tab-importar" class="tab-content hidden">
       <div class="card p-6 max-w-2xl">
         <h2 class="font-bold text-lg mb-1"><i class="fa-solid fa-file-import mr-2 text-[var(--accent)]"></i>Importar histórico desde Excel</h2>
-        <p class="text-sm text-[var(--muted)] mb-4">Sube el archivo GESPERSONAS.xlsx (u otro con las mismas columnas). Las fichas se cargarán en Firebase marcadas como <b>históricas</b>. Si una ficha con el mismo número de FN ya existe, se omite para no duplicar.</p>
+        <p class="text-sm text-[var(--muted)] mb-4">Sube el archivo GESPERSONAS.xlsx (u otro con las mismas columnas). Las fichas se cargarán en Firebase marcadas como <b>históricas</b>. Si ya existe una ficha con el mismo número de FN y PUESTO G.E., se omite para no duplicar.</p>
         <input id="import-file" type="file" accept=".xlsx,.xls" class="input mb-4">
         <button id="btn-importar" class="btn px-4 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent2)] text-sm" disabled>
           <i class="fa-solid fa-upload mr-1"></i>Analizar e importar
@@ -1499,8 +1499,9 @@ document.getElementById('import-file').addEventListener('change', async (e)=>{
     Object.entries(mapaColumnas).forEach(([excelCol, campo])=>{
       let v = r[excelCol];
       if(v instanceof Date) v = fechaInputValue(v);
-      obj[campo] = (v===undefined || v===null) ? '' : String(v).trim();
+      obj[campo] = (v===undefined || v===null) ? '' : String(v).replace(/[\t ]+/g,' ').trim();
     });
+    if(/^-\d+$/.test(obj.diasOriginal)) obj.diasOriginal = ''; // fórmula de Excel sin fecha de alta
     return obj;
   }).filter(r=> r.fn); // descarta filas sin nº de FN
   log(`Archivo analizado: ${importRows.length} fichas detectadas.`);
@@ -1520,12 +1521,13 @@ document.getElementById('btn-importar').addEventListener('click', async ()=>{
   document.getElementById('import-log').innerHTML = '';
 
   try{
-    // nº de FN ya existentes en Firestore, para no duplicar
-    const existentes = new Set(fichas.map(f=>f.fn));
-
-    const pendientes = importRows.filter(r => !existentes.has(r.fn));
+    // Una FN puede cubrir varios puestos: la ficha se identifica por FN + PUESTO G.E.
+    const claveFicha = f => String(f.fn||'').trim().toUpperCase()+'|'+String(f.puestoGE||'').trim().toUpperCase();
+    const existentes = new Set(fichas.map(claveFicha));
+    const pendientes = [];
+    for(const r of importRows){ const k = claveFicha(r); if(!existentes.has(k)){ existentes.add(k); pendientes.push(r); } }
     const omitidas = importRows.length - pendientes.length;
-    if(omitidas) log(`${omitidas} ficha(s) omitidas por tener un nº de FN ya existente.`);
+    if(omitidas) log(`${omitidas} ficha(s) omitidas porque ya existían (mismo nº de FN y PUESTO G.E.).`);
 
     let hechas = 0;
     const total = pendientes.length;
@@ -1535,7 +1537,9 @@ document.getElementById('btn-importar').addEventListener('click', async ()=>{
       const trozo = pendientes.slice(i, i+LOTE);
       const batch = db.batch();
       trozo.forEach(r=>{
-        const ref = db.collection(COL_FICHAS).doc();
+        // ID fijo a partir de FN + PUESTO G.E.: reimportar el mismo Excel nunca duplica
+        const idFicha = (r.fn+'_'+(r.puestoGE||'sin-puesto')).toUpperCase().replace(/[\/\s]+/g,'-').replace(/[^A-Z0-9_.-]/g,'');
+        const ref = db.collection(COL_FICHAS).doc(idFicha);
         batch.set(ref, {
           ...r,
           historico: true,
