@@ -314,14 +314,14 @@
       <div><label class="text-xs text-[var(--muted)]">Nº FN</label><input id="ff-fn" class="input" placeholder="FN-000001/2026"></div>
       <div><label class="text-xs text-[var(--muted)]">Fecha FN</label><input id="ff-fechafn" type="date" class="input"></div>
       <div><label class="text-xs text-[var(--muted)]">BC</label><input id="ff-bc" class="input"></div>
-      <div class="relative">
-        <label class="text-xs text-[var(--muted)]">Puesto G.E. <span class="text-[var(--accent)]">(catálogo)</span></label>
-        <input id="ff-puestoge" class="input" placeholder="Busca por código, puesto o nombre..." autocomplete="off">
-        <div id="ff-puestoge-dropdown" class="hidden absolute z-50 mt-1 w-full max-h-56 overflow-y-auto card border border-[var(--border)] shadow-xl"></div>
+      <div><label class="text-xs text-[var(--muted)]">Encargo <span class="text-[var(--accent)]">(Personal adscrito)</span></label><select id="ff-encargo" class="input" autocomplete="off"></select></div>
+      <div class="md:col-span-2"><label class="text-xs text-[var(--muted)]">Acción</label><select id="ff-accion" class="input" autocomplete="off"></select></div>
+      <div class="md:col-span-2">
+        <label class="text-xs text-[var(--muted)]">Puesto G.E. <span class="text-[var(--accent)]">(Personal adscrito de la acción)</span></label>
+        <select id="ff-puestoge" class="input" autocomplete="off"></select>
+        <div id="ff-puestoge-dropdown" class="hidden"></div>
         <p id="ff-puestoge-info" class="text-xs mt-1"></p>
       </div>
-      <div><label class="text-xs text-[var(--muted)]">Encargo</label><input id="ff-encargo" class="input"></div>
-      <div><label class="text-xs text-[var(--muted)]">Acción</label><input id="ff-accion" class="input"></div>
       <div>
         <label class="text-xs text-[var(--muted)]">Grupo</label>
         <select id="ff-grupo" class="input"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option></select>
@@ -346,19 +346,6 @@
           <option value="DESIERTO">DESIERTO</option>
         </select>
       </div>
-      <div>
-        <label class="text-xs text-[var(--muted)]">Solicitud DG necesidad</label>
-        <select id="ff-solicituddg" class="input"><option value=""></option><option>SI</option><option>NO</option></select>
-      </div>
-      <div>
-        <label class="text-xs text-[var(--muted)]">Comunicación DG incorporación</label>
-        <select id="ff-comunicaciondg" class="input"><option value=""></option><option>SI</option><option>NO</option></select>
-      </div>
-      <div>
-        <label class="text-xs text-[var(--muted)]">Preinforme</label>
-        <select id="ff-preinforme" class="input"><option value=""></option><option>SI</option><option>NO</option><option>PREINF</option></select>
-      </div>
-      <div><label class="text-xs text-[var(--muted)]">Días (calculado)</label><input id="ff-dias" class="input" disabled></div>
     </div>
 
     <div class="grid md:grid-cols-2 gap-4 mt-4 border-t border-[var(--border)] pt-4">
@@ -934,7 +921,7 @@ function catalogoDesdePersonal(staff, jobs){
       puestoTrabajo: p.role||'', grupo: String(p.group||'').toUpperCase(), centroTrabajo: p.center||'',
       direccion: p.address||'', provincia: '', festivoLocal: p.holiday||'', titulacion: p.degree||'',
       tipoContrato: p.contract||'', encargo: job.code || String(p.jobKey||'').split('_')[0],
-      accion: p.jobKey||'', coordinacion: p.coord||'', nombreEncargo: job.name || p.jobName || '',
+      accion: p.jobKey||'', accionTexto: p.actionText||'', coordinacion: p.coord||'', nombreEncargo: job.name || p.jobName || '',
       horas: p.hours ?? '', teletrabajo: p.telework||'', mail: p.email||'', movil: p.mobile||'',
       dni: p.dni||'', cod: ocupadas.map(x=>x.emp).join(' / '), expediente: job.exp || p.exp || '',
       fechaFin: p.jobEnd||'', obs: p.obs||'', origen: ocupadas.length ? 'ADSCRITO' : 'VACANTE'
@@ -1186,7 +1173,7 @@ function buscarPuestos(q){
 
 function pintarInfoPuesto(codigo){
   if(!puestosCatalogo.length){
-    ffPuestoInfo.innerHTML = '<span class="text-amber-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i>El catálogo de puestos está vacío. Ve a la pestaña "Catálogo de Puestos" e impórtalo primero.</span>';
+    ffPuestoInfo.innerHTML = '<span class="text-amber-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i>No hay puestos en PERSONAL ADSCRITO de Gestión Forestal.</span>';
     return;
   }
   const p = puestosCatalogo.find(x=>x.id===codigo);
@@ -1197,36 +1184,50 @@ function pintarInfoPuesto(codigo){
   ffPuestoInfo.innerHTML = `<span class="text-green-700"><i class="fa-solid fa-check mr-1"></i>Ocupante actual: ${p.nombre||'(vacante)'} · ${p.centroTrabajo||''}</span>`;
 }
 
-ffPuestoInput.addEventListener('input', ()=>{
-  const matches = buscarPuestos(ffPuestoInput.value);
-  if(!matches.length){ ffPuestoDropdown.classList.add('hidden'); pintarInfoPuesto(sanitizeCodigo(ffPuestoInput.value)); return; }
-  ffPuestoDropdown.innerHTML = matches.map(p=>`
-    <div class="px-3 py-2 hover:bg-[var(--bg3)] cursor-pointer text-sm border-b border-[var(--border)] last:border-0" data-codigo="${p.id}">
-      <div class="font-semibold">${p.id} <span class="text-[var(--muted)] font-normal">— ${p.puestoTrabajo||''}</span></div>
-      <div class="text-xs text-[var(--muted)]">${p.nombre||'(vacante)'} · ${p.centroTrabajo||''}</div>
-    </div>`).join('');
-  ffPuestoDropdown.classList.remove('hidden');
-});
-
-ffPuestoDropdown.addEventListener('click', (e)=>{
-  const row = e.target.closest('[data-codigo]');
-  if(!row) return;
-  const p = puestosCatalogo.find(x=>x.id===row.dataset.codigo);
-  if(!p) return;
-  ffPuestoInput.value = p.id;
-  document.getElementById('ff-denominacion').value = p.puestoTrabajo||'';
-  document.getElementById('ff-grupo').value = p.grupo||'';
-  document.getElementById('ff-centro').value = p.centroTrabajo||'';
-  document.getElementById('ff-direccion').value = p.direccion||'';
-  document.getElementById('ff-titulacion').value = p.titulacion||'';
-  document.getElementById('ff-encargo').value = p.encargo||'';
-  document.getElementById('ff-accion').value = p.accion||'';
-  ffPuestoDropdown.classList.add('hidden');
-  pintarInfoPuesto(p.id);
-});
-
-document.addEventListener('click', (e)=>{
-  if(!ffPuestoInput.contains(e.target) && !ffPuestoDropdown.contains(e.target)) ffPuestoDropdown.classList.add('hidden');
+// Encargo → Acción → Puesto G.E. (desplegables con los puestos de PERSONAL ADSCRITO)
+const ffEnc = document.getElementById('ff-encargo'), ffAcc = document.getElementById('ff-accion');
+const opcion = (sel, value, label) => { const o = document.createElement('option'); o.value = value; o.textContent = label; sel.appendChild(o); };
+const cmp = (a,b)=> String(a).localeCompare(String(b), 'es', {numeric:true});
+function llenarEncargos(actual){
+  const m = new Map(); puestosCatalogo.forEach(p=>{ if(p.encargo && !m.has(p.encargo)) m.set(p.encargo, p.nombreEncargo||''); });
+  ffEnc.innerHTML = ''; opcion(ffEnc, '', '— Elige el encargo —');
+  [...m.keys()].sort(cmp).forEach(k=> opcion(ffEnc, k, k + (m.get(k) ? ' · ' + m.get(k) : '')));
+  if(actual && !m.has(actual)) opcion(ffEnc, actual, actual + ' (no está en Personal adscrito)');
+  ffEnc.value = actual || '';
+}
+function llenarAcciones(actual){
+  const m = new Map(); puestosCatalogo.forEach(p=>{ if(p.encargo === ffEnc.value && p.accion && !m.has(p.accion)) m.set(p.accion, p.accionTexto||''); });
+  ffAcc.innerHTML = ''; opcion(ffAcc, '', ffEnc.value ? '— Elige la acción —' : '— Elige antes el encargo —');
+  [...m.keys()].sort(cmp).forEach(k=> opcion(ffAcc, k, k + (m.get(k) ? ' · ' + m.get(k) : '')));
+  if(actual && !m.has(actual)) opcion(ffAcc, actual, actual + ' (no está en Personal adscrito)');
+  ffAcc.value = actual || '';
+}
+function llenarPuestos(actual){
+  const lista = puestosCatalogo.filter(p=> p.encargo === ffEnc.value && p.accion === ffAcc.value).sort((a,b)=>cmp(a.id,b.id));
+  ffPuestoInput.innerHTML = ''; opcion(ffPuestoInput, '', ffAcc.value ? '— Elige el Puesto G.E. —' : '— Elige antes la acción —');
+  lista.forEach(p=> opcion(ffPuestoInput, p.id, p.id + ' — ' + (p.puestoTrabajo||'') + ' — ' + (p.nombre || '(vacante)')));
+  if(actual && !lista.some(p=>p.id===actual)) opcion(ffPuestoInput, actual, actual + ' (no está en Personal adscrito)');
+  ffPuestoInput.value = actual || '';
+}
+function fijarPuestoFicha(enc, acc, puesto){
+  // Si solo se conoce el puesto, se deducen encargo y acción
+  const p = puesto && puestosCatalogo.find(x=>x.id===puesto);
+  if(p){ enc = enc || p.encargo; acc = acc || p.accion; }
+  llenarEncargos(enc); llenarAcciones(acc); llenarPuestos(puesto);
+  pintarInfoPuesto(puesto);
+}
+ffEnc.addEventListener('change', ()=>{ llenarAcciones(''); llenarPuestos(''); pintarInfoPuesto(''); });
+ffAcc.addEventListener('change', ()=>{ llenarPuestos(''); pintarInfoPuesto(''); });
+ffPuestoInput.addEventListener('change', ()=>{
+  const p = puestosCatalogo.find(x=>x.id===ffPuestoInput.value);
+  if(p){
+    document.getElementById('ff-denominacion').value = p.puestoTrabajo||'';
+    document.getElementById('ff-grupo').value = p.grupo||'';
+    document.getElementById('ff-centro').value = p.centroTrabajo||'';
+    document.getElementById('ff-direccion').value = p.direccion||'';
+    document.getElementById('ff-titulacion').value = p.titulacion||'';
+  }
+  pintarInfoPuesto(ffPuestoInput.value);
 });
 
 /* ======================================================================
@@ -1234,7 +1235,7 @@ document.addEventListener('click', (e)=>{
    ====================================================================== */
 const modalFicha = document.getElementById('modal-ficha');
 const camposFF = ['descripcion','fn','fechafn','bc','puestoge','encargo','accion','grupo','denominacion',
-  'titulacion','centro','direccion','fifm','fechaalta','trabajador','estado','solicituddg','comunicaciondg','preinforme'];
+  'titulacion','centro','direccion','fifm','fechaalta','trabajador','estado'];
 
 /* ----------------------------------------------------------------------
    Adjuntos PDF (elegidos desde el equipo, guardados dentro de la propia
@@ -1341,7 +1342,6 @@ document.getElementById('modal-ficha').addEventListener('click', (e)=>{
 
 function limpiarModal(){
   camposFF.forEach(c=> document.getElementById('ff-'+c).value = '');
-  document.getElementById('ff-dias').value = '';
   document.getElementById('pdf-fn-file').value = '';
   document.getElementById('pdf-fi-file').value = '';
   pdfPendiente = { fn: null, fi: null };
@@ -1365,9 +1365,7 @@ function abrirModalFicha(id){
     document.getElementById('ff-fn').value = f.fn||'';
     document.getElementById('ff-fechafn').value = fechaInputValue(parseFecha(f.fechaFN));
     document.getElementById('ff-bc').value = f.bc||'';
-    document.getElementById('ff-puestoge').value = f.puestoGE||'';
-    document.getElementById('ff-encargo').value = f.encargo||'';
-    document.getElementById('ff-accion').value = f.accion||'';
+    fijarPuestoFicha(f.encargo||'', f.accion||'', sanitizeCodigo(f.puestoGE||''));
     document.getElementById('ff-grupo').value = f.grupo||'';
     document.getElementById('ff-denominacion').value = f.denominacionPuesto||'';
     document.getElementById('ff-titulacion').value = f.titulacion||'';
@@ -1377,16 +1375,13 @@ function abrirModalFicha(id){
     document.getElementById('ff-fechaalta').value = f.fechaAlta||'';
     document.getElementById('ff-trabajador').value = f.trabajador||'';
     document.getElementById('ff-estado').value = f.estado||'';
-    document.getElementById('ff-solicituddg').value = f.solicitudDG||'';
-    document.getElementById('ff-comunicaciondg').value = f.comunicacionDG||'';
-    document.getElementById('ff-preinforme').value = f.preinforme||'';
-    document.getElementById('ff-dias').value = f._dias ?? '';
     pintarCajaAdjunto('fn');
     pintarCajaAdjunto('fi');
     if(f.puestoGE) pintarInfoPuesto(sanitizeCodigo(f.puestoGE));
   } else {
     document.getElementById('modal-ficha-title').textContent = 'Nueva ficha de necesidad';
     document.getElementById('ff-fechafn').value = fechaInputValue(new Date());
+    fijarPuestoFicha('', '', '');
     if(!puestosCatalogo.length) pintarInfoPuesto(null);
   }
   modalFicha.classList.remove('hidden');
@@ -1419,9 +1414,6 @@ document.getElementById('btn-guardar-ficha').addEventListener('click', async ()=
     fechaAlta: document.getElementById('ff-fechaalta').value.trim(),
     trabajador: document.getElementById('ff-trabajador').value.trim(),
     estado: document.getElementById('ff-estado').value,
-    solicitudDG: document.getElementById('ff-solicituddg').value,
-    comunicacionDG: document.getElementById('ff-comunicaciondg').value,
-    preinforme: document.getElementById('ff-preinforme').value,
     actualizadoEn: firebase.firestore.FieldValue.serverTimestamp(),
     actualizadoPor: currentUser ? currentUser.email : null
   };
