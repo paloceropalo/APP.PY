@@ -2,7 +2,7 @@
 setlocal
 chcp 65001 >nul
 rem ============================================================
-rem  Actualiza public\gestion_forestal.html (incluye la consulta de personal)
+rem  Actualiza en public gestion_forestal.html, GESPERSONAS.html y procesador-variables-V7.html
 rem  guardada en GitHub y publica el sitio cuadrante-secona.
 rem  Coloca este archivo en la carpeta hosting-gpex.
 rem ============================================================
@@ -16,7 +16,7 @@ if not exist "public" (
 
 set "BASE=https://raw.githubusercontent.com/paloceropalo/APP.PY/claude/bold-meitner-82dkkx/gestion-forestal"
 
-for %%F in (gestion_forestal.html) do (
+for %%F in (gestion_forestal.html GESPERSONAS.html procesador-variables-V7.html) do (
   call :descargar %%F
   if errorlevel 1 exit /b 1
 )
