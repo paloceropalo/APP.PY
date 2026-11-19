@@ -705,11 +705,11 @@ function clavePersona(p){
 // Mapa clave de persona → última baja sin alta posterior
 function bajasActivas(movs){
   const m = new Map();
-  [...movs].sort((a,b)=> String(a.fecha||'').localeCompare(String(b.fecha||'')) || String(a.creado||'').localeCompare(String(b.creado||'')))
+  [...movs].sort((a,b)=> String(a.fecha||String(a.creado||'').slice(0,10)).localeCompare(String(b.fecha||String(b.creado||'').slice(0,10))) || String(a.creado||'').localeCompare(String(b.creado||'')))
     .forEach(mv=>{ const k = mv.pkey || clavePersona(mv); if(mv.tipo==='baja') m.set(k, mv); else if(mv.tipo==='alta') m.delete(k); });
   return m;
 }
-const fechaDMY = iso => { const [a,m,d] = String(iso||'').split('-'); return d ? `${d}/${m}/${a}` : String(iso||''); };
+const fechaDMY = iso => { const [a,m,d] = String(iso||'').split('-'); return d ? `${d}/${m}/${a}` : (iso ? String(iso) : 'fecha desconocida'); };
 // Ficha cerrada con trabajador y fecha de alta: si el puesto tiene una baja en curso sin sustituto,
 // en el registro de Altas/Bajas pasa a «Sustituido por <trabajador>».
 async function marcarSustitucion(ficha){

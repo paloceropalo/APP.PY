@@ -1452,7 +1452,7 @@ function nombreBaja(nombre) {
 function periodosBajaPorPersona() {
   const personas = new Map();
   const orden = [...movimientosBajas].sort((a, b) =>
-    String(a.fecha || '').localeCompare(String(b.fecha || '')) || String(a.creado || '').localeCompare(String(b.creado || '')));
+    String(a.fecha || String(a.creado || '').slice(0, 10)).localeCompare(String(b.fecha || String(b.creado || '').slice(0, 10))) || String(a.creado || '').localeCompare(String(b.creado || '')));
   orden.forEach(mv => {
     const emp = codigoBaja(mv.emp);
     const clave = mv.pkey || (emp ? 'e:' + emp : 'n:' + nombreBaja(mv.name));
@@ -1460,7 +1460,8 @@ function periodosBajaPorPersona() {
     const per = personas.get(clave);
     if (!per.emp && emp) per.emp = emp;
     const abierto = per.periodos.find(x => !x.hasta);
-    const fecha = String(mv.fecha || '').slice(0, 10);
+    // Sin fecha conocida: una baja cuenta como de baja desde siempre (se revisa); un alta, como hoy.
+    const fecha = String(mv.fecha || '').slice(0, 10) || (mv.tipo === 'baja' ? FECHA_DESCONOCIDA : isoFecha(new Date()));
     if (mv.tipo === 'baja') {
       const motivo = MOTIVOS_BAJA[mv.motivo] ? mv.motivo : 'it';
       if (abierto) abierto.motivo = motivo;
@@ -1483,12 +1484,14 @@ function periodosBajaTrabajador(cod, nombre) {
 function isoFecha(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+const FECHA_DESCONOCIDA = '0000-01-01';
 function fechaIsoATexto(iso) {
+  if (iso === FECHA_DESCONOCIDA) return 'fecha desconocida';
   const [a, m, d] = String(iso || '').split('-');
   return d ? `${d}/${m}/${a}` : String(iso || '');
 }
 function textoPeriodoBaja(p) {
-  return `${MOTIVOS_BAJA[p.motivo]} desde el ${fechaIsoATexto(p.desde)}` +
+  return `${MOTIVOS_BAJA[p.motivo]} desde ${p.desde === FECHA_DESCONOCIDA ? 'fecha desconocida' : 'el ' + fechaIsoATexto(p.desde)}` +
     (p.hasta ? `, alta el ${fechaIsoATexto(p.hasta)}` : ' (sigue de baja)');
 }
 

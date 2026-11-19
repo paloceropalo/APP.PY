@@ -294,7 +294,7 @@ const COL='gf_adscripciones';
 let fdb=null, BASE=[], MOVES=[];
 /* Bajas IT en curso (registro «Altas/Bajas»): clave = código de empleado o nombre + puesto */
 const personKey=d=>{ const e=txt(d.emp).replace(/^0+/,''); return e?'e:'+e:'n:'+strip(txt(d.name)).toLowerCase().replace(/\s+/g,' ').trim()+'|'+txt(d.puesto).toUpperCase(); };
-function itMap(){ const m=new Map(); [...MOVES].sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||''))||String(a.creado||'').localeCompare(String(b.creado||'')))
+function itMap(){ const m=new Map(); [...MOVES].sort((a,b)=>String(a.fecha||String(a.creado||'').slice(0,10)).localeCompare(String(b.fecha||String(b.creado||'').slice(0,10)))||String(a.creado||'').localeCompare(String(b.creado||'')))
   .forEach(x=>{ const k=x.pkey||personKey(x); if(x.tipo==='baja')m.set(k,x); else if(x.tipo==='alta')m.delete(k); }); return m; }
 const dmy=iso=>iso?iso.split('-').reverse().join('/'):'';
 const numOrNull=v=>{const n=parseFloat(String(v??'').replace(',','.'));return isFinite(n)&&n>0?n:null;};
@@ -541,7 +541,7 @@ function cell(r,c,i){
   const cl=i===0?' class="c1"':i===1?' class="c2"':'';
   switch(c.id){
     case 'puestoGE': return `<td${cl} title="${esc(r.puestoGE)}">${val(r.puestoGE)}${rolTag(r)}</td>`;
-    case 'nombre': return `<td${cl} title="${esc(r.nombre)}${r.it?' · '+esc(BAJAS[r.it.motivo][1].toLowerCase())+' desde '+esc(fmtFecha(r.it.desde)):''}"><span class="nm">${esc(r.nombre)}</span>${r.it?`<span class="tag tag-it">${esc(BAJAS[r.it.motivo][0])} ${esc(fmtFecha(r.it.desde))}</span>`:''}${r.plaza?`<span class="tag tag-plaza" title="${esc(r.vacMotivo?'Motivo: '+r.vacMotivo:'Motivo sin indicar')}">Plaza no cubierta</span>`:''}${r.obs?`<span class="tag tag-obs" title="${esc(obsTitle(r))}">${esc(r.obs)}</span>`:''}${editado(r)?'<span class="tag tag-ed" title="Registro editado">✎</span>':''}</td>`;
+    case 'nombre': return `<td${cl} title="${esc(r.nombre)}${r.it?' · '+esc(BAJAS[r.it.motivo][1].toLowerCase())+' desde '+esc((fmtFecha(r.it.desde)||'fecha desconocida')):''}"><span class="nm">${esc(r.nombre)}</span>${r.it?`<span class="tag tag-it">${esc(BAJAS[r.it.motivo][0])} ${esc((fmtFecha(r.it.desde)||'fecha desconocida'))}</span>`:''}${r.plaza?`<span class="tag tag-plaza" title="${esc(r.vacMotivo?'Motivo: '+r.vacMotivo:'Motivo sin indicar')}">Plaza no cubierta</span>`:''}${r.obs?`<span class="tag tag-obs" title="${esc(obsTitle(r))}">${esc(r.obs)}</span>`:''}${editado(r)?'<span class="tag tag-ed" title="Registro editado">✎</span>':''}</td>`;
     case 'comp': { const t=compText(r); return `<td${cl} title="${esc(t)}">${t?esc(t)+(r.motivoEf?'':' <span class="dash">(motivo sin indicar)</span>'):dash}</td>`; }
     case 'cod': return `<td class="cc">${val(r.cod)}</td>`;
     case 'grupo': return `<td><span class="gr">${esc(r.grupo)}</span></td>`;
@@ -706,7 +706,7 @@ function renderDrawer(){
     ${E?`<input type="text" name="nombre" aria-label="Nombre" value="${esc(r.nombre)}">`:`<h2>${esc(r.nombre)} ${rolTag(r)}</h2>`}
     <div class="sub">${esc(r.puestoGE)||''}${r.cod?' · Cód. '+esc(r.cod):''}${E?' · modo edición':''}</div>
     ${r.plaza?`<div class="aviso aviso-plaza">Plaza no cubierta (sin trabajador con código). ${r.vacMotivo?'Motivo: <b>'+esc(r.vacMotivo)+'</b>':'Motivo sin indicar: se indica en la pestaña «Plazas no cubiertas».'}</div>`:''}
-    ${r.it?`<div class="aviso aviso-it">${esc(BAJAS[r.it.motivo][1])} desde el <b>${esc(fmtFecha(r.it.desde))}</b>${r.it.notas?' · '+esc(r.it.notas):''}. El alta se registra en la pestaña «Altas/Bajas».</div>`:''}
+    ${r.it?`<div class="aviso aviso-it">${esc(BAJAS[r.it.motivo][1])} desde el <b>${esc((fmtFecha(r.it.desde)||'fecha desconocida'))}</b>${r.it.notas?' · '+esc(r.it.notas):''}. El alta se registra en la pestaña «Altas/Bajas».</div>`:''}
     ${(!E&&ne)?`<div class="aviso">Registro con ${ne} campo${ne>1?'s':''} modificado${ne>1?'s':''} respecto al Excel. <button class="btn sm" type="button" data-restore>Deshacer cambios</button></div>`:''}
   </div>
   <div class="db">
