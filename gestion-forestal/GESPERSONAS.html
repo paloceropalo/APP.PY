@@ -677,7 +677,7 @@ async function arrancarApp(){
   // Catálogo de puestos = PERSONAL ADSCRITO de Gestión Forestal (gf_adscripciones + gf_encargos), en tiempo real
   let gfStaff = [], gfJobs = {};
   const recalcular = ()=>{
-    puestosCatalogo = catalogoDesdePersonal(gfStaff, gfJobs);
+    puestosCatalogo = catalogoDesdePersonal(gfStaff, gfJobs, bajasActivas(gfMovimientos));
     refreshCatalogoFiltrosOptions();
     aplicarFiltrosPuestos();
   };
@@ -687,7 +687,30 @@ async function arrancarApp(){
   db.collection('gf_adscripciones').onSnapshot(snap=>{
     gfStaff = snap.docs.map(d=>d.data()); recalcular();
   }, err=>{ console.error(err); toast('Error leyendo PERSONAL ADSCRITO de Gestión Forestal.', 'error'); });
+  // Altas/Bajas de Gestión Forestal: para saber qué puestos tienen al ocupante de baja o excedencia
+  db.collection('gf_movimientos').onSnapshot(snap=>{
+    gfMovimientos = snap.docs.map(d=>d.data()); recalcular();
+  }, err=>{ console.error(err); toast('Error leyendo el registro de Altas/Bajas de Gestión Forestal.', 'error'); });
 }
+
+/* --- Bajas y excedencias en curso (registro «Altas/Bajas» de Gestión Forestal) --- */
+let gfMovimientos = [];
+const MOTIVOS_BAJA = { it:'Baja IT', exc_incomp:'Excedencia por incompatibilidad', exc_interes:'Excedencia por interés particular', voluntaria:'Baja voluntaria' };
+const sinAcentos = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+// Misma clave de persona que usa Gestión Forestal: código de empleado sin ceros, o nombre + puesto
+function clavePersona(p){
+  const e = String(p?.emp||'').trim().replace(/^0+/,'');
+  return e ? 'e:'+e : 'n:'+sinAcentos(p?.name)+'|'+String(p?.puesto||'').trim().toUpperCase();
+}
+// Mapa clave de persona → última baja sin alta posterior
+function bajasActivas(movs){
+  const m = new Map();
+  [...movs].sort((a,b)=> String(a.fecha||'').localeCompare(String(b.fecha||'')) || String(a.creado||'').localeCompare(String(b.creado||'')))
+    .forEach(mv=>{ const k = mv.pkey || clavePersona(mv); if(mv.tipo==='baja') m.set(k, mv); else if(mv.tipo==='alta') m.delete(k); });
+  return m;
+}
+const fechaDMY = iso => { const [a,m,d] = String(iso||'').split('-'); return d ? `${d}/${m}/${a}` : String(iso||''); };
+const textoBaja = mv => (MOTIVOS_BAJA[mv.motivo] || MOTIVOS_BAJA.it) + ' desde ' + fechaDMY(mv.fecha);
 
 function refreshCentroOptions(){
   const centros = [...new Set(fichas.map(f=>f.centroTrabajo).filter(Boolean))].sort();
@@ -901,7 +924,7 @@ function buildTablaPuestos(){
 }
 
 // Una fila por PUESTO G.E. Si en el puesto hay varias personas (titular y sustituto/a) se muestran todas.
-function catalogoDesdePersonal(staff, jobs){
+function catalogoDesdePersonal(staff, jobs, bajas = new Map()){
   const conCodigo = p => /^\d+$/.test(String(p.emp||'').trim());
   const grupos = new Map();
   for(const p of staff){
@@ -915,8 +938,12 @@ function catalogoDesdePersonal(staff, jobs){
     const ocupadas = filas.filter(conCodigo);
     const p = ocupadas[0] || filas[0];
     const job = jobs[p.job] || {};
+    // Personas del puesto que constan de baja o excedencia (registro de Altas/Bajas)
+    const deBaja = ocupadas.map(x=>({ x, mv: bajas.get(clavePersona(x)) })).filter(o=>o.mv);
     out.push({
       id,
+      situacion: !ocupadas.length ? 'vacante' : deBaja.length ? 'baja' : 'ocupado',
+      situacionTexto: !ocupadas.length ? 'Vacante' : deBaja.map(o=>`${o.x.name||o.x.emp} (${textoBaja(o.mv)})`).join(' / '),
       nombre: ocupadas.map(x=>x.name).filter(Boolean).join(' / '),
       puestoTrabajo: p.role||'', grupo: String(p.group||'').toUpperCase(), centroTrabajo: p.center||'',
       direccion: p.address||'', provincia: '', festivoLocal: p.holiday||'', titulacion: p.degree||'',
@@ -1181,32 +1208,42 @@ function pintarInfoPuesto(codigo){
     ffPuestoInfo.innerHTML = codigo ? '<span class="text-amber-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Código no encontrado en el catálogo de puestos.</span>' : '';
     return;
   }
-  ffPuestoInfo.innerHTML = `<span class="text-green-700"><i class="fa-solid fa-check mr-1"></i>Ocupante actual: ${p.nombre||'(vacante)'} · ${p.centroTrabajo||''}</span>`;
+  if(p.situacion === 'ocupado'){
+    ffPuestoInfo.innerHTML = `<span class="text-amber-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Puesto ocupado por ${p.nombre||''}: no consta de baja, excedencia ni vacante.</span>`;
+    return;
+  }
+  ffPuestoInfo.innerHTML = `<span class="text-green-700"><i class="fa-solid fa-check mr-1"></i>${p.situacion === 'vacante' ? 'Puesto vacante' : 'De baja: ' + p.situacionTexto} · ${p.centroTrabajo||''}</span>`;
 }
 
 // Encargo → Acción → Puesto G.E. (desplegables con los puestos de PERSONAL ADSCRITO)
 const ffEnc = document.getElementById('ff-encargo'), ffAcc = document.getElementById('ff-accion');
 const opcion = (sel, value, label) => { const o = document.createElement('option'); o.value = value; o.textContent = label; sel.appendChild(o); };
 const cmp = (a,b)=> String(a).localeCompare(String(b), 'es', {numeric:true});
+// En una ficha de necesidad solo se pueden elegir puestos vacantes o con el ocupante de baja/excedencia
+const puestoLibre = p => p.situacion === 'vacante' || p.situacion === 'baja';
 function llenarEncargos(actual){
-  const m = new Map(); puestosCatalogo.forEach(p=>{ if(p.encargo && !m.has(p.encargo)) m.set(p.encargo, p.nombreEncargo||''); });
+  const m = new Map(); puestosCatalogo.forEach(p=>{ if(puestoLibre(p) && p.encargo && !m.has(p.encargo)) m.set(p.encargo, p.nombreEncargo||''); });
   ffEnc.innerHTML = ''; opcion(ffEnc, '', '— Elige el encargo —');
   [...m.keys()].sort(cmp).forEach(k=> opcion(ffEnc, k, k + (m.get(k) ? ' · ' + m.get(k) : '')));
-  if(actual && !m.has(actual)) opcion(ffEnc, actual, actual + ' (no está en Personal adscrito)');
+  if(actual && !m.has(actual)) opcion(ffEnc, actual, actual + (puestosCatalogo.some(p=>p.encargo===actual) ? ' (sin puestos vacantes ni de baja)' : ' (no está en Personal adscrito)'));
   ffEnc.value = actual || '';
 }
 function llenarAcciones(actual){
-  const m = new Map(); puestosCatalogo.forEach(p=>{ if(p.encargo === ffEnc.value && p.accion && !m.has(p.accion)) m.set(p.accion, p.accionTexto||''); });
+  const m = new Map(); puestosCatalogo.forEach(p=>{ if(puestoLibre(p) && p.encargo === ffEnc.value && p.accion && !m.has(p.accion)) m.set(p.accion, p.accionTexto||''); });
   ffAcc.innerHTML = ''; opcion(ffAcc, '', ffEnc.value ? '— Elige la acción —' : '— Elige antes el encargo —');
   [...m.keys()].sort(cmp).forEach(k=> opcion(ffAcc, k, k + (m.get(k) ? ' · ' + m.get(k) : '')));
-  if(actual && !m.has(actual)) opcion(ffAcc, actual, actual + ' (no está en Personal adscrito)');
+  if(actual && !m.has(actual)) opcion(ffAcc, actual, actual + (puestosCatalogo.some(p=>p.accion===actual) ? ' (sin puestos vacantes ni de baja)' : ' (no está en Personal adscrito)'));
   ffAcc.value = actual || '';
 }
 function llenarPuestos(actual){
-  const lista = puestosCatalogo.filter(p=> p.encargo === ffEnc.value && p.accion === ffAcc.value).sort((a,b)=>cmp(a.id,b.id));
-  ffPuestoInput.innerHTML = ''; opcion(ffPuestoInput, '', ffAcc.value ? '— Elige el Puesto G.E. —' : '— Elige antes la acción —');
-  lista.forEach(p=> opcion(ffPuestoInput, p.id, p.id + ' — ' + (p.puestoTrabajo||'') + ' — ' + (p.nombre || '(vacante)')));
-  if(actual && !lista.some(p=>p.id===actual)) opcion(ffPuestoInput, actual, actual + ' (no está en Personal adscrito)');
+  const lista = puestosCatalogo.filter(p=> puestoLibre(p) && p.encargo === ffEnc.value && p.accion === ffAcc.value).sort((a,b)=>cmp(a.id,b.id));
+  ffPuestoInput.innerHTML = '';
+  opcion(ffPuestoInput, '', !ffAcc.value ? '— Elige antes la acción —' : lista.length ? '— Elige el Puesto G.E. (vacantes o de baja/excedencia) —' : '— Esta acción no tiene puestos vacantes ni de baja —');
+  lista.forEach(p=> opcion(ffPuestoInput, p.id, p.id + ' — ' + (p.puestoTrabajo||'') + ' — ' + (p.situacion === 'vacante' ? 'VACANTE' : p.situacionTexto)));
+  if(actual && !lista.some(p=>p.id===actual)){
+    const ocupado = puestosCatalogo.find(p=>p.id===actual);
+    opcion(ffPuestoInput, actual, actual + (ocupado ? ' — ocupado por ' + (ocupado.nombre||'') : ' (no está en Personal adscrito)'));
+  }
   ffPuestoInput.value = actual || '';
 }
 function fijarPuestoFicha(enc, acc, puesto){
