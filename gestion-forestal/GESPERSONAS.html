@@ -231,8 +231,9 @@
       <div class="card p-4 mb-4">
         <p class="text-sm text-[var(--muted)] mb-3">
           <i class="fa-solid fa-circle-info mr-1"></i>
-          El campo <b>PUESTO G.E.</b> es el identificador único de cada puesto de trabajo. Este catálogo se nutre de los
-          ficheros DATOS_PERSONAL de cada coordinador/a y es la referencia obligatoria al crear una ficha de necesidad.
+          El campo <b>PUESTO G.E.</b> es el identificador único de cada puesto de trabajo. Este catálogo se obtiene en tiempo real de
+          <b>PERSONAL ADSCRITO</b> de Gestión Forestal (es la referencia obligatoria al crear una ficha de necesidad). Para añadir o
+          corregir un puesto, hazlo en la pestaña PERSONAL ADSCRITO.
         </p>
         <div class="flex flex-wrap gap-3 items-end">
           <div class="flex-1 min-w-[200px]">
@@ -241,18 +242,18 @@
           </div>
           <div class="w-32">
             <label class="text-xs text-[var(--muted)]">Grupo</label>
-            <select id="pf-grupo" class="input">
+            <select id="pf-grupo" class="input" autocomplete="off">
               <option value="">Todos</option>
               <option>A</option><option>B</option><option>C</option><option>D</option>
             </select>
           </div>
           <div class="w-56">
             <label class="text-xs text-[var(--muted)]">Centro de trabajo</label>
-            <select id="pf-centro" class="input"><option value="">Todos</option></select>
+            <select id="pf-centro" class="input" autocomplete="off"><option value="">Todos</option></select>
           </div>
           <div class="w-52">
             <label class="text-xs text-[var(--muted)]">Coordinación</label>
-            <select id="pf-coordinacion" class="input"><option value="">Todas</option></select>
+            <select id="pf-coordinacion" class="input" autocomplete="off"><option value="">Todas</option></select>
           </div>
           <button id="pf-limpiar" class="btn px-3 py-2 rounded-lg bg-[var(--bg3)] border border-[var(--border)] text-sm">Limpiar</button>
         </div>
@@ -261,11 +262,11 @@
       <div class="flex justify-between items-center mb-3">
         <div class="text-sm text-[var(--muted)]"><span id="count-puestos">0</span> puestos en catálogo</div>
         <div class="flex gap-2 items-center">
-          <label class="btn px-3 py-2 rounded-lg bg-[var(--bg3)] border border-[var(--border)] text-sm cursor-pointer">
+          <label class="btn px-3 py-2 rounded-lg bg-[var(--bg3)] border border-[var(--border)] text-sm cursor-pointer" hidden style="display:none">
             <i class="fa-solid fa-file-import mr-1 text-[var(--accent)]"></i>Importar/Actualizar desde Excel
             <input id="input-import-puestos" type="file" accept=".xlsx,.xls" class="hidden">
           </label>
-          <button id="btn-nuevo-puesto" class="btn px-4 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent2)] text-sm">
+          <button id="btn-nuevo-puesto" style="display:none" class="btn px-4 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent2)] text-sm">
             <i class="fa-solid fa-plus mr-1"></i>Nuevo puesto manual
           </button>
         </div>
@@ -686,14 +687,19 @@ async function arrancarApp(){
     console.error(err);
     toast('Error leyendo Firestore: revisa las reglas de seguridad.', 'error');
   });
-  db.collection(COL_PUESTOS).onSnapshot(snap=>{
-    puestosCatalogo = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+  // Catálogo de puestos = PERSONAL ADSCRITO de Gestión Forestal (gf_adscripciones + gf_encargos), en tiempo real
+  let gfStaff = [], gfJobs = {};
+  const recalcular = ()=>{
+    puestosCatalogo = catalogoDesdePersonal(gfStaff, gfJobs);
     refreshCatalogoFiltrosOptions();
     aplicarFiltrosPuestos();
-  }, err=>{
-    console.error(err);
-    toast('Error leyendo el catálogo de puestos.', 'error');
-  });
+  };
+  db.collection('gf_encargos').onSnapshot(snap=>{
+    gfJobs = Object.fromEntries(snap.docs.map(d=>[d.id, d.data()])); recalcular();
+  }, err=>{ console.error(err); toast('Error leyendo los encargos de Gestión Forestal.', 'error'); });
+  db.collection('gf_adscripciones').onSnapshot(snap=>{
+    gfStaff = snap.docs.map(d=>d.data()); recalcular();
+  }, err=>{ console.error(err); toast('Error leyendo PERSONAL ADSCRITO de Gestión Forestal.', 'error'); });
 }
 
 function refreshCentroOptions(){
@@ -888,7 +894,7 @@ function buildTablaPuestos(){
     layout: 'fitColumns',
     renderVertical: 'basic',
     height: '600px',
-    placeholder: 'Sin puestos en el catálogo. Importa un archivo DATOS_PERSONAL para empezar.',
+    placeholder: 'Sin puestos: el catálogo se obtiene de PERSONAL ADSCRITO de Gestión Forestal.',
     columns: [
       {title:'Puesto G.E.', field:'id', minWidth:120, widthGrow:1, cellClick:abrirDesdeClick},
       {title:'Nombre ocupante', field:'nombre', minWidth:150, widthGrow:2, cellClick:abrirDesdeClick},
@@ -905,6 +911,36 @@ function buildTablaPuestos(){
     ],
     rowClick: (e, row)=> abrirModalPuesto(row.getData().id)
   });
+}
+
+// Una fila por PUESTO G.E. Si en el puesto hay varias personas (titular y sustituto/a) se muestran todas.
+function catalogoDesdePersonal(staff, jobs){
+  const conCodigo = p => /^\d+$/.test(String(p.emp||'').trim());
+  const grupos = new Map();
+  for(const p of staff){
+    const id = String(p.puesto||'').trim().toUpperCase();
+    if(!id) continue;
+    if(!grupos.has(id)) grupos.set(id, []);
+    grupos.get(id).push(p);
+  }
+  const out = [];
+  for(const [id, filas] of grupos){
+    const ocupadas = filas.filter(conCodigo);
+    const p = ocupadas[0] || filas[0];
+    const job = jobs[p.job] || {};
+    out.push({
+      id,
+      nombre: ocupadas.map(x=>x.name).filter(Boolean).join(' / '),
+      puestoTrabajo: p.role||'', grupo: String(p.group||'').toUpperCase(), centroTrabajo: p.center||'',
+      direccion: p.address||'', provincia: '', festivoLocal: p.holiday||'', titulacion: p.degree||'',
+      tipoContrato: p.contract||'', encargo: job.code || String(p.jobKey||'').split('_')[0],
+      accion: p.jobKey||'', coordinacion: p.coord||'', nombreEncargo: job.name || p.jobName || '',
+      horas: p.hours ?? '', teletrabajo: p.telework||'', mail: p.email||'', movil: p.mobile||'',
+      dni: p.dni||'', cod: ocupadas.map(x=>x.emp).join(' / '), expediente: job.exp || p.exp || '',
+      fechaFin: p.jobEnd||'', obs: p.obs||'', origen: ocupadas.length ? 'ADSCRITO' : 'VACANTE'
+    });
+  }
+  return out;
 }
 
 function refreshCatalogoFiltrosOptions(){
@@ -966,7 +1002,7 @@ function abrirModalPuesto(codigo){
   if(codigo){
     const p = puestosCatalogo.find(x=>x.id===codigo);
     if(!p) return;
-    document.getElementById('modal-puesto-title').textContent = 'Editar puesto · ' + codigo;
+    document.getElementById('modal-puesto-title').textContent = 'Puesto · ' + codigo + ' (se edita en PERSONAL ADSCRITO)';
     document.getElementById('pp-puestoge').value = codigo;
     document.getElementById('pp-puestoge').disabled = true; // el código es la clave, no se cambia en edición
     document.getElementById('pp-nombre').value = p.nombre||'';
@@ -994,6 +1030,11 @@ function abrirModalPuesto(codigo){
   } else {
     document.getElementById('modal-puesto-title').textContent = 'Nuevo puesto';
   }
+  // Solo consulta: los datos vienen de PERSONAL ADSCRITO
+  modalPuesto.querySelectorAll('input,select,textarea').forEach(el=> el.disabled = true);
+  document.getElementById('btn-guardar-puesto').style.display = 'none';
+  document.getElementById('btn-eliminar-puesto').style.display = 'none';
+  document.getElementById('btn-cancelar-puesto').textContent = 'Cerrar';
   modalPuesto.classList.remove('hidden'); modalPuesto.classList.add('flex');
 }
 function cerrarModalPuesto(){ modalPuesto.classList.add('hidden'); modalPuesto.classList.remove('flex'); }
