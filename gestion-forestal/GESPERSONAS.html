@@ -940,9 +940,13 @@ function catalogoDesdePersonal(staff, jobs, bajas = new Map()){
     const job = jobs[p.job] || {};
     // Personas del puesto que constan de baja o excedencia (registro de Altas/Bajas)
     const deBaja = ocupadas.map(x=>({ x, mv: bajas.get(clavePersona(x)) })).filter(o=>o.mv);
+    // Solo queda libre si nadie más trabaja en el puesto: si hay otra persona de alta
+    // (el sustituto) o la baja está marcada como sustituida, el puesto ya está cubierto.
+    const enActivo = ocupadas.filter(x=>!bajas.get(clavePersona(x)));
+    const sustituida = deBaja.some(o=>o.mv.cobertura === 'sustituido');
     out.push({
       id,
-      situacion: !ocupadas.length ? 'vacante' : deBaja.length ? 'baja' : 'ocupado',
+      situacion: !ocupadas.length ? 'vacante' : (deBaja.length && !enActivo.length && !sustituida) ? 'baja' : 'ocupado',
       situacionTexto: !ocupadas.length ? 'Vacante' : deBaja.map(o=>`${o.x.name||o.x.emp} (${textoBaja(o.mv)})`).join(' / '),
       nombre: ocupadas.map(x=>x.name).filter(Boolean).join(' / '),
       puestoTrabajo: p.role||'', grupo: String(p.group||'').toUpperCase(), centroTrabajo: p.center||'',
