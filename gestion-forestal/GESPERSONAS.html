@@ -76,6 +76,15 @@
   .tabulator-row.row-finalizada .tabulator-cell{color:#173d10 !important; font-weight:600;}
   .tabulator-row.row-cerrada{border-left:8px solid #565d4d !important; background:#dcdfd5 !important; opacity:.9; filter:grayscale(50%);}
   .tabulator-row.row-cerrada:hover{background:#cdd1c4 !important; opacity:1;}
+  /* Tablas compactas: una línea por ficha (el texto completo aparece al pasar el ratón) */
+  .tabulator{font-size:12px;}
+  .tabulator-cell{white-space:nowrap !important; overflow:hidden; text-overflow:ellipsis; word-break:normal; line-height:1.25; padding:3px 6px !important;}
+  .tabulator-col-title{white-space:nowrap !important; overflow:hidden; text-overflow:ellipsis;}
+  .tabulator .tabulator-header .tabulator-col .tabulator-col-content{padding:5px 6px !important;}
+  .tabulator-row.row-tramite,.tabulator-row.row-finalizada,.tabulator-row.row-cerrada{border-left-width:4px !important;}
+  .tabulator-row.row-tramite .tabulator-cell,.tabulator-row.row-finalizada .tabulator-cell{font-weight:500;}
+  .tabulator-cell .badge{padding:0 7px; font-size:11px; white-space:nowrap;}
+  .tabulator-cell i.text-base{font-size:13px;}
 </style>
 </head>
 <body class="min-h-screen">
@@ -718,8 +727,9 @@ function buildTable(){
     data: [],
     layout: 'fitColumns',
     renderVertical: 'basic',
-    height: '640px',
+    height: 'max(420px, calc(100vh - 230px))',
     placeholder: 'Sin fichas que mostrar',
+    columnDefaults: {tooltip:true},
     rowFormatter:function(row){
       const el = row.getElement();
       const data = row.getData();
@@ -729,32 +739,32 @@ function buildTable(){
       else el.classList.add('row-cerrada');
     },
     columns: [
-      {title:'FN', field:'fn', minWidth:95, widthGrow:1, cellClick:abrirDesdeClick},
-      {title:'Fecha FN', field:'fechaFN', minWidth:85, widthGrow:1, cellClick:abrirDesdeClick, formatter:(cell)=> fmtFecha(parseFecha(cell.getValue())) },
-      {title:'Descripción', field:'descripcion', minWidth:130, widthGrow:2, cellClick:abrirDesdeClick},
-      {title:'BC', field:'bc', minWidth:80, widthGrow:1, cellClick:abrirDesdeClick},
-      {title:'Puesto G.E.', field:'puestoGE', minWidth:110, widthGrow:1, cellClick:abrirDesdeClick},
+      {title:'FN', field:'fn', width:122, widthGrow:0, cellClick:abrirDesdeClick},
+      {title:'Fecha FN', field:'fechaFN', width:88, widthGrow:0, cellClick:abrirDesdeClick, formatter:(cell)=> fmtFecha(parseFecha(cell.getValue())) },
+      {title:'Descripción', field:'descripcion', minWidth:130, widthGrow:3, cellClick:abrirDesdeClick},
+      {title:'BC', field:'bc', width:74, widthGrow:0, cellClick:abrirDesdeClick},
+      {title:'Puesto G.E.', field:'puestoGE', width:136, widthGrow:0, cellClick:abrirDesdeClick},
       {title:'Denominación puesto', field:'denominacionPuesto', minWidth:120, widthGrow:2, cellClick:abrirDesdeClick},
       {title:'Titulación exigida', field:'titulacion', minWidth:120, widthGrow:2, cellClick:abrirDesdeClick},
       {title:'Centro de trabajo', field:'centroTrabajo', minWidth:120, widthGrow:2, cellClick:abrirDesdeClick},
       {title:'Trabajador/a', field:'trabajador', minWidth:100, widthGrow:1, cellClick:abrirDesdeClick},
-      {title:'Nº FI/FM', field:'fiFm', minWidth:95, widthGrow:1, editor:'input',
+      {title:'Nº FI/FM', field:'fiFm', width:116, widthGrow:0, editor:'input',
         cellEdited:(cell)=> guardarCampoFicha(cell),
         tooltip:'Haz doble clic para editar'},
-      {title:'Fecha de alta', field:'fechaAlta', minWidth:95, widthGrow:1, editor:'input',
+      {title:'Fecha de alta', field:'fechaAlta', width:88, widthGrow:0, editor:'input',
         formatter:(cell)=>{ const v = cell.getValue(); const d = parseFecha(v); return d ? fmtFecha(d) : (v||''); },
         cellEdited:(cell)=> guardarCampoFicha(cell),
         tooltip:'Haz doble clic para editar (fecha o texto como CANCELADO/DESIERTO)'},
-      {title:'Estado', field:'estado', minWidth:85, widthGrow:1, hozAlign:'center', cellClick:abrirDesdeClick, formatter:(cell)=>{
+      {title:'Estado', field:'estado', width:118, widthGrow:0, hozAlign:'center', cellClick:abrirDesdeClick, formatter:(cell)=>{
         const v = cell.getValue() || 'EN TRÁMITE';
         return `<span class="badge ${estadoPillClass(cell.getValue())}">${estadoIcono(cell.getValue())}${v}</span>`;
       }},
-      {title:'Días', field:'_dias', width:55, widthGrow:0, hozAlign:'center', cellClick:abrirDesdeClick, formatter:(cell)=>{
+      {title:'Días', field:'_dias', width:58, widthGrow:0, hozAlign:'center', cellClick:abrirDesdeClick, formatter:(cell)=>{
         const v = cell.getValue();
         if(v===null||v===undefined) return '<span class="text-[var(--muted)]">—</span>';
         return `<span class="badge ${diasPillClass(v)}">${v}</span>`;
       }, sorter:'number'},
-      {title:'PDF FN', field:'pdfFNData', width:60, widthGrow:0, hozAlign:'center', headerSort:false,
+      {title:'PDF FN', field:'pdfFNData', width:58, widthGrow:0, hozAlign:'center', headerSort:false,
         formatter:(cell)=>{
           const f = cell.getRow().getData();
           if(f.pdfFNData) return '<i class="fa-solid fa-file-pdf text-red-600 text-base" title="Ver PDF de la Ficha de Necesidad"></i>';
@@ -768,7 +778,7 @@ function buildTable(){
           else if(f.pdfFNLink) window.open(f.pdfFNLink, '_blank');
           else abrirModalFicha(f.id);
         }},
-      {title:'PDF FI', field:'pdfFIData', width:60, widthGrow:0, hozAlign:'center', headerSort:false,
+      {title:'PDF FI', field:'pdfFIData', width:56, widthGrow:0, hozAlign:'center', headerSort:false,
         formatter:(cell)=>{
           const f = cell.getRow().getData();
           if(f.pdfFIData) return '<i class="fa-solid fa-file-pdf text-[var(--accent)] text-base" title="Ver PDF de la Ficha de Incorporación"></i>';
