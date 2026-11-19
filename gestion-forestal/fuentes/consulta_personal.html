@@ -247,7 +247,7 @@ const titulo=s=>String(s||'').toLowerCase().replace(/[\p{L}\p{N}]+/gu,(w,off)=>(
 const dash='<span class="dash">—</span>';
 /* color de la etiqueta del responsable según su nombre de pila (Marcos, Marta…) */
 /* Interinos (contrato 410 u obs. INT) y sustitutos: Puesto G.E., código y nombre en azul */
-const esSus=r=>/^410/.test(String(r.contrato||''))||String(r.obs||'').toUpperCase()==='INT'||r.rolEf==='sustituto'||r.rol==='sustituto'||/sustitut/i.test(String((r._doc||{}).shared||''));
+const esSus=r=>/^410/.test(String(r.contrato||''))||r.rolEf==='sustituto'||r.rol==='sustituto'||/sustitut/i.test(String((r._doc||{}).shared||''));
 /* Tipos de baja del registro «Altas/Bajas» */
 const BAJAS={it:['IT','Baja por enfermedad (IT)'],maternidad:['Maternidad/paternidad','Baja por maternidad/paternidad'],lactancia:['Lactancia','Permiso de lactancia'],exc_incomp:['Excedencia','Excedencia por incompatibilidad'],exc_interes:['Excedencia','Excedencia por interés particular'],voluntaria:['Baja voluntaria','Baja voluntaria']};
 const pillCls=v=>titulo(String(v||'').trim().split(/\s+/)[0]||'');
@@ -427,7 +427,7 @@ function rebuild(){
      El rol puede fijarse a mano en modo edición. */
   byGE.forEach(g0=>{
     const g=g0.filter(r=>r.compartido.length); if(g.length<2)return;
-    g.forEach(r=>{ r.rolEf=r.rol||((/^410/.test(r.contrato)||r.obs==='INT')?'sustituto':'titular'); });
+    g.forEach(r=>{ r.rolEf=r.rol||(/^410/.test(r.contrato)?'sustituto':'titular'); });
     const hasT=g.some(r=>r.rolEf==='titular'), hasS=g.some(r=>r.rolEf==='sustituto');
     if(!(hasT&&hasS))g.forEach(r=>{ if(!r.rol)r.rolEf=''; });
     const man=g.map(r=>r.motivo).find(Boolean);
