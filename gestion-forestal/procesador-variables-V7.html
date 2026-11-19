@@ -358,6 +358,13 @@
   .contrato-tabla td.cod { font-family: var(--mono); font-size: 12px; color: var(--accent2); width: 90px; }
   .contrato-tabla td.nom { color: var(--text); }
   .contrato-tabla td.acc { width: 36px; text-align: right; }
+  .baja-tag {
+    display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 9px;
+    background: rgba(239,68,68,0.15); color: var(--danger); font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  .contrato-tabla tr.de-baja td.nom { color: var(--danger); }
+  .revision-item.baja .revision-detalle { color: var(--danger); }
+  .aviso-bajas { margin-top: 8px; font-size: 12px; color: var(--warning); }
   .btn-quitar-contrato { background: none; border: none; color: var(--text3); cursor: pointer; padding: 2px 4px; border-radius: 4px; }
   .btn-quitar-contrato:hover { color: var(--danger); }
   .btn-restaurar { margin-top: 12px; background: none; border: 1px solid var(--border2); color: var(--text3); border-radius: 8px; padding: 6px 12px; font-family: var(--sans); font-size: 12px; cursor: pointer; }
@@ -649,6 +656,8 @@
         blanco para rellenarlas directamente en el propio Excel, igual que hasta ahora.
       </p>
 
+      <div id="revisionLaboral" style="display:none;"></div>
+
       <div id="tableContainerLaboral" class="empty-state">
         <i class="ti ti-table-off"></i>
         <p>Sube los Variables_*.xlsx del mes y pulsa <strong>Cargar / recalcular variables</strong>.</p>
@@ -688,6 +697,8 @@
       <p class="maint-desc">
         Estos trabajadores cobran <strong>1 unidad</strong> de turnicidad cada mes, hagan o no cambios de turno,
         por lo que quedan excluidos de la revisión de turnicidad en la pestaña Procesar.
+        <strong>Excepción:</strong> si están de baja o de excedencia en el mes que se procesa (registro de
+        Altas/Bajas de Gestión Forestal), aparecen en la revisión para confirmar si procede pagar el turno.
       </p>
       <div class="contrato-add">
         <input class="field-input cod" type="text" id="addCodTurnicidad" placeholder="Código" onkeydown="if(event.key==='Enter') agregarContrato('turnicidad')">
@@ -695,6 +706,7 @@
         <button class="btn-add-contrato" onclick="agregarContrato('turnicidad')"><i class="ti ti-plus" aria-hidden="true"></i> Añadir</button>
       </div>
       <div id="listaTurnicidad"></div>
+      <div id="avisoBajas" class="aviso-bajas" style="display:none;"></div>
     </div>
   </section>
 
@@ -1401,6 +1413,105 @@ try {
   contratosRef = appCompartida.firestore().collection('cv_config').doc('contratos');
 } catch (err) { console.warn('No se pudo conectar con la base de datos compartida:', err); }
 
+// ---- Bajas y excedencias (registro «Altas/Bajas» de Gestión Forestal) ----
+// Colección gf_movimientos del proyecto cuadrante-secona. Cada documento es
+// una baja (tipo 'baja', con motivo it / exc_incomp / exc_interes / voluntaria)
+// o un alta (tipo 'alta'), con su fecha (AAAA-MM-DD). Una baja sigue abierta
+// hasta que la misma persona tiene un alta posterior.
+const MOTIVOS_BAJA = {
+  it: 'Baja IT', exc_incomp: 'Excedencia por incompatibilidad',
+  exc_interes: 'Excedencia por interés particular', voluntaria: 'Baja voluntaria'
+};
+let movimientosBajas = [];
+let bajasListas = false;   // true cuando ya se ha leído el registro
+let errorBajas = '';       // texto del error si no se pudo leer
+
+function cargarBajas() {
+  if (!contratosRef) { errorBajas = 'sin conexión con la base de datos compartida'; return; }
+  contratosRef.firestore.collection('gf_movimientos').onSnapshot(snap => {
+    movimientosBajas = snap.docs.map(d => d.data());
+    bajasListas = true;
+    errorBajas = '';
+    renderContratos();
+  }, err => {
+    console.error('No se pudo leer el registro de Altas/Bajas:', err);
+    bajasListas = false;
+    errorBajas = err.code || err.message;
+    renderContratos();
+  });
+}
+
+function codigoBaja(cod) { return String(cod ?? '').trim().replace(/^0+(?=\d)/, ''); }
+// Nombre comparable sin importar el orden ("HISADO IGLESIAS, ANA BELEN" = "Ana Belen Hisado Iglesias")
+function nombreBaja(nombre) {
+  return normalizarTexto(nombre).replace(/[^A-Z ]/g, ' ').split(' ').filter(Boolean).sort().join(' ');
+}
+
+// Agrupa los movimientos por persona y los convierte en periodos {desde, hasta, motivo}.
+// 'hasta' es la fecha del alta (el día que vuelve), o null si sigue de baja.
+function periodosBajaPorPersona() {
+  const personas = new Map();
+  const orden = [...movimientosBajas].sort((a, b) =>
+    String(a.fecha || '').localeCompare(String(b.fecha || '')) || String(a.creado || '').localeCompare(String(b.creado || '')));
+  orden.forEach(mv => {
+    const emp = codigoBaja(mv.emp);
+    const clave = mv.pkey || (emp ? 'e:' + emp : 'n:' + nombreBaja(mv.name));
+    if (!personas.has(clave)) personas.set(clave, { emp, nombre: nombreBaja(mv.name), periodos: [] });
+    const per = personas.get(clave);
+    if (!per.emp && emp) per.emp = emp;
+    const abierto = per.periodos.find(x => !x.hasta);
+    const fecha = String(mv.fecha || '').slice(0, 10);
+    if (mv.tipo === 'baja') {
+      const motivo = MOTIVOS_BAJA[mv.motivo] ? mv.motivo : 'it';
+      if (abierto) abierto.motivo = motivo;
+      else per.periodos.push({ desde: fecha, hasta: null, motivo });
+    } else if (mv.tipo === 'alta' && abierto) {
+      abierto.hasta = fecha;
+    }
+  });
+  return [...personas.values()];
+}
+
+// Periodos de baja de un trabajador (por código; por nombre si el registro no tiene código)
+function periodosBajaTrabajador(cod, nombre) {
+  const c = codigoBaja(cod), n = nombreBaja(nombre);
+  return periodosBajaPorPersona()
+    .filter(p => (p.emp && p.emp === c) || (!p.emp && n && p.nombre === n))
+    .flatMap(p => p.periodos);
+}
+
+function isoFecha(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function fechaIsoATexto(iso) {
+  const [a, m, d] = String(iso || '').split('-');
+  return d ? `${d}/${m}/${a}` : String(iso || '');
+}
+function textoPeriodoBaja(p) {
+  return `${MOTIVOS_BAJA[p.motivo]} desde el ${fechaIsoATexto(p.desde)}` +
+    (p.hasta ? `, alta el ${fechaIsoATexto(p.hasta)}` : ' (sigue de baja)');
+}
+
+// Bajas que tocan el mes indicado (anio, mes 1-12). Devuelve null si no hay ninguna.
+function bajaEnMes(cod, nombre, anio, mes) {
+  const ini = `${anio}-${String(mes).padStart(2, '0')}-01`;
+  const fin = isoFecha(new Date(anio, mes, 0));
+  const periodos = periodosBajaTrabajador(cod, nombre)
+    .filter(p => p.desde && p.desde <= fin && (!p.hasta || p.hasta > ini));
+  if (periodos.length === 0) return null;
+  const todoElMes = periodos.some(p => p.desde <= ini && (!p.hasta || p.hasta > fin));
+  return {
+    todoElMes,
+    texto: periodos.map(textoPeriodoBaja).join(' · ') + (todoElMes ? ' — de baja todo el mes' : ' — parte del mes')
+  };
+}
+
+// Baja vigente hoy (para marcarla en la lista de Contratos)
+function bajaActual(cod, nombre) {
+  const hoy = isoFecha(new Date());
+  return periodosBajaTrabajador(cod, nombre).find(p => p.desde && p.desde <= hoy && (!p.hasta || p.hasta > hoy)) || null;
+}
+
 function avisoContratos(texto, error) {
   const el = document.getElementById('estadoContratosTexto');
   if (!el) return;
@@ -1452,12 +1563,20 @@ function renderContratos() {
     if (!el) return;
     if (lista.length === 0) { el.innerHTML = '<p class="maint-hint">Sin trabajadores en esta lista.</p>'; return; }
     el.innerHTML = `<table class="contrato-tabla"><thead><tr><th>Código</th><th>Trabajador</th><th></th></tr></thead><tbody>` +
-      lista.map((c, i) => `<tr>
+      lista.map((c, i) => {
+        const baja = bajaActual(c.cod, c.nombre);
+        return `<tr${baja ? ' class="de-baja"' : ''}>
         <td class="cod">${escHtml(c.cod)}</td>
-        <td class="nom">${escHtml(c.nombre)}</td>
+        <td class="nom">${escHtml(c.nombre)}${baja ? `<span class="baja-tag" title="${escHtml(textoPeriodoBaja(baja))}">${escHtml(MOTIVOS_BAJA[baja.motivo])} desde ${fechaIsoATexto(baja.desde)}</span>` : ''}</td>
         <td class="acc"><button class="btn-quitar-contrato" title="Quitar de la lista" onclick="quitarContrato('${tipo}', ${i})"><i class="ti ti-trash" aria-hidden="true"></i></button></td>
-      </tr>`).join('') + `</tbody></table><p class="maint-hint" style="margin-top:8px;">${lista.length} trabajador(es)</p>`;
+      </tr>`;
+      }).join('') + `</tbody></table><p class="maint-hint" style="margin-top:8px;">${lista.length} trabajador(es)</p>`;
   });
+  const aviso = document.getElementById('avisoBajas');
+  if (aviso) {
+    aviso.style.display = errorBajas ? '' : 'none';
+    aviso.textContent = errorBajas ? `No se pudo leer el registro de Altas/Bajas (${errorBajas}): no se marcan los trabajadores de baja.` : '';
+  }
 }
 
 function agregarContrato(tipo) {
@@ -1493,6 +1612,7 @@ function restaurarContratos() {
 }
 
 cargarContratos();
+cargarBajas();
 cargarFestivos2027();
 cargarFestivosOficiales();
 
@@ -1970,8 +2090,17 @@ async function procesarArchivos() {
       Object.values(grupos).forEach(g => {
         // Turnicidad por contrato: se abona siempre 1 unidad y no pasa por la revisión.
         const turnicidadContrato = tieneTurnicidadContrato(g.Codigo);
-        const turnicidad = (turnicidadContrato || g.TiposTurno.size >= 2) ? 1 : 0; // unidad (1 = se abona el mes), no el importe en €
+        // Si el trabajador con turnicidad por contrato está de baja en el mes, no se
+        // abona sin más: pasa a la revisión para confirmar si procede el pago.
+        let bajaContrato = null;
         if (turnicidadContrato) {
+          const diaRef = g.JornadasMes.map(j => j.dia).find(d => d instanceof Date && !isNaN(d));
+          if (diaRef) bajaContrato = bajaEnMes(g.Codigo, g.Nombre, diaRef.getFullYear(), diaRef.getMonth() + 1);
+        }
+        const turnicidad = (bajaContrato ? !bajaContrato.todoElMes : (turnicidadContrato || g.TiposTurno.size >= 2)) ? 1 : 0; // unidad (1 = se abona el mes), no el importe en €
+        if (bajaContrato) {
+          detalleTurnicidad[`${encargo}||${g.Codigo}`] = `Turnicidad por contrato, pero consta de baja: ${bajaContrato.texto}. Confirma si procede el pago.`;
+        } else if (turnicidadContrato) {
           detalleTurnicidad[`${encargo}||${g.Codigo}`] = 'Incluido por contrato (no depende de los cambios de turno)';
         } else if (turnicidad > 0) {
           // Si dos tipos vienen del mismo día+entrada (turno combinado tipo
@@ -1990,7 +2119,7 @@ async function procesarArchivos() {
           }).join(' · ');
           detalleTurnicidad[`${encargo}||${g.Codigo}`] = detalle;
         }
-        if (g.Festivos_Pagar > 0 || g.HE_LV > 0 || g.HE_FS > 0 || g.Plus_Nocturnidad > 0 || turnicidad > 0) {
+        if (g.Festivos_Pagar > 0 || g.HE_LV > 0 || g.HE_FS > 0 || g.Plus_Nocturnidad > 0 || turnicidad > 0 || bajaContrato) {
           datosFinales.push({
             'Encargo / Acción': encargo,
             'Código Trabajador': g.Codigo,
@@ -2001,13 +2130,16 @@ async function procesarArchivos() {
             'Plus Nocturnidad (Unidades)': g.Plus_Nocturnidad,
             'Plus Turnicidad (Unidades)': turnicidad
           });
-          if (turnicidad > 0 && !turnicidadContrato) {
+          if ((turnicidad > 0 && !turnicidadContrato) || bajaContrato) {
             candidatosTurnicidad.push({
               filaIdx: datosFinales.length - 1,
               encargo, codigo: g.Codigo, nombre: g.Nombre,
               detalle: detalleTurnicidad[`${encargo}||${g.Codigo}`] || '',
               jornadas: [...g.JornadasMes].sort((a, b) => a.dia - b.dia),
-              confirmado: true, // pendiente de revisión visual; se aplica por defecto hasta que se desmarque
+              // pendiente de revisión visual; se aplica por defecto hasta que se desmarque
+              // (de baja todo el mes: sale desmarcado y hay que marcarlo si procede pagar)
+              confirmado: turnicidad > 0,
+              baja: !!bajaContrato,
               expandido: false
             });
           }
@@ -2020,6 +2152,9 @@ async function procesarArchivos() {
     }
   }
 
+  if (!bajasListas && contratos.turnicidad.length > 0) {
+    log(`[WARN] No se pudo consultar el registro de Altas/Bajas${errorBajas ? ' (' + errorBajas + ')' : ''}: la turnicidad por contrato se abona sin comprobar si el trabajador está de baja.`, 'warn');
+  }
   if (codigosResueltosPorRespaldo.size > 0) {
     log(`[OK] ${codigosResueltosPorRespaldo.size} código(s) resueltos por el respaldo local (Firestore no los tenía): ${[...codigosResueltosPorRespaldo].join(', ')}`, 'ok');
   }
@@ -2070,9 +2205,9 @@ function renderRevisionTurnicidad() {
 
   cont.innerHTML = `<div class="revision-turnicidad">
     <h4><i class="ti ti-alert-triangle" aria-hidden="true"></i> Revisa el Plus Turnicidad detectado (${nConfirmados} de ${candidatosTurnicidad.length} marcados)</h4>
-    <p>Se detecta automáticamente a partir de los fichajes de cada trabajador. Desmarca los que no correspondan de verdad a un cambio de turno antes de descargar — el Excel solo incluirá los que queden marcados.</p>
+    <p>Se detecta automáticamente a partir de los fichajes de cada trabajador. Desmarca los que no correspondan de verdad a un cambio de turno antes de descargar — el Excel solo incluirá los que queden marcados.${candidatosTurnicidad.some(c => c.baja) ? ' Los trabajadores con turnicidad por contrato que constan de baja en el mes aparecen en rojo: márcalos solo si procede pagarles el turno.' : ''}</p>
     ${candidatosTurnicidad.map((c, idx) => `
-      <div class="revision-item">
+      <div class="revision-item${c.baja ? ' baja' : ''}">
         <input type="checkbox" id="turnicidad_${idx}" ${c.confirmado ? 'checked' : ''} onchange="toggleTurnicidad(${idx}, this.checked)">
         <label for="turnicidad_${idx}">
           <div class="revision-nombre">${c.nombre} <span class="mono" style="color:var(--text3);font-size:11px;">(${c.codigo} · ${c.encargo})</span></div>
@@ -2505,6 +2640,9 @@ async function cargarVariablesLaboral() {
     }
   }
 
+  // Códigos que vienen en los Variables_*.xlsx: su turnicidad ya se revisó en la pestaña Procesar.
+  const codigosEnArchivos = new Set(Object.keys(totalesAuto));
+
   // Trabajadores con complementos por contrato: se añaden aunque no vengan en los archivos.
   if (document.getElementById('laboralIncluirContrato')?.checked) {
     const añadidos = [];
@@ -2525,6 +2663,22 @@ async function cargarVariablesLaboral() {
   // nuevas para códigos que no existían todavía.
   const existentes = new Map(filasLaboral.map(f => [f.codigo, f]));
   const nuevasFilas = [];
+
+  // Mes del informe, para comprobar bajas de la turnicidad por contrato
+  const MESES_LABORAL = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+  const mesSel = MESES_LABORAL.indexOf(document.getElementById('laboralMes').value) + 1;
+  const anioSel = parseInt(document.getElementById('laboralAnio').value, 10);
+  const hoy = new Date();
+  const mesBajas = mesSel > 0 ? mesSel : hoy.getMonth() + 1;
+  const anioBajas = anioSel > 2000 ? anioSel : hoy.getFullYear();
+  if (contratos.turnicidad.length > 0) {
+    if (!bajasListas) {
+      logEn('logAreaLaboral', `[WARN] No se pudo consultar el registro de Altas/Bajas${errorBajas ? ' (' + errorBajas + ')' : ''}: la turnicidad por contrato se abona sin comprobar bajas.`, 'warn');
+    } else if (!(mesSel > 0 && anioSel > 2000)) {
+      logEn('logAreaLaboral', `[WARN] Sin año o mes elegidos: las bajas se comprueban para ${MESES_LABORAL[mesBajas - 1]} ${anioBajas}.`, 'warn');
+    }
+  }
+  candidatosLaboral = [];
   Object.keys(totalesAuto).sort().forEach(cod => {
     const t = totalesAuto[cod];
     const prev = existentes.get(cod);
@@ -2540,10 +2694,22 @@ async function cargarVariablesLaboral() {
     base.heLV = parseFloat(t.heLV.toFixed(2));
     base.heFinde = parseFloat(t.heFinde.toFixed(2));
     base.turnicidad = (t.turnicidad > 0 || tieneTurnicidadContrato(cod)) ? Math.max(1, parseFloat(t.turnicidad.toFixed(2))) : '';
+    const bajaContrato = tieneTurnicidadContrato(cod) ? bajaEnMes(cod, base.nombre, anioBajas, mesBajas) : null;
+    if (bajaContrato) {
+      if (codigosEnArchivos.has(cod)) {
+        // Ya se confirmó en la revisión de Procesar: se respeta lo que trae el archivo.
+        base.turnicidad = t.turnicidad > 0 ? Math.max(1, parseFloat(t.turnicidad.toFixed(2))) : '';
+        logEn('logAreaLaboral', `[AVISO] ${base.nombre} (${cod}) consta de baja (${bajaContrato.texto}). Turnicidad según lo confirmado en Procesar: ${base.turnicidad ? 'se paga' : 'no se paga'}.`, 'warn');
+      } else {
+        base.turnicidad = bajaContrato.todoElMes ? '' : 1;
+        candidatosLaboral.push({ codigo: cod, nombre: base.nombre, detalle: bajaContrato.texto, confirmado: !bajaContrato.todoElMes });
+      }
+    }
     if (tienePeligrosidadContrato(cod)) base.peligrosidad = 1;
     nuevasFilas.push(base);
   });
   filasLaboral = nuevasFilas;
+  renderRevisionLaboral();
 
   document.getElementById('statTrabajadoresLaboral').textContent = filasLaboral.length;
   document.getElementById('statArchivosLaboral').textContent = archivosOk;
@@ -2569,6 +2735,37 @@ async function cargarVariablesLaboral() {
   }
 
   btnCargarLaboral.disabled = false;
+}
+
+// Turnicidad por contrato de trabajadores que constan de baja en el mes del informe
+let candidatosLaboral = []; // { codigo, nombre, detalle, confirmado }
+
+function renderRevisionLaboral() {
+  const cont = document.getElementById('revisionLaboral');
+  if (!cont) return;
+  if (candidatosLaboral.length === 0) { cont.style.display = 'none'; cont.innerHTML = ''; return; }
+  cont.style.display = '';
+  const n = candidatosLaboral.filter(c => c.confirmado).length;
+  cont.innerHTML = `<div class="revision-turnicidad">
+    <h4><i class="ti ti-alert-triangle" aria-hidden="true"></i> Turnicidad por contrato de trabajadores de baja (${n} de ${candidatosLaboral.length} se pagan)</h4>
+    <p>Constan de baja o excedencia en el mes del informe según el registro de Altas/Bajas. Marca solo a quienes proceda pagar el turno; el Excel incluirá la turnicidad de los marcados.</p>
+    ${candidatosLaboral.map((c, idx) => `
+      <div class="revision-item baja">
+        <input type="checkbox" id="turnLaboral_${idx}" ${c.confirmado ? 'checked' : ''} onchange="toggleTurnicidadLaboral(${idx}, this.checked)">
+        <label for="turnLaboral_${idx}">
+          <div class="revision-nombre">${escHtml(c.nombre)} <span class="mono" style="color:var(--text3);font-size:11px;">(${escHtml(c.codigo)})</span></div>
+          <div class="revision-detalle">${escHtml(c.detalle)}</div>
+        </label>
+      </div>`).join('')}
+  </div>`;
+}
+
+function toggleTurnicidadLaboral(idx, checked) {
+  const c = candidatosLaboral[idx];
+  c.confirmado = checked;
+  const fila = filasLaboral.find(f => f.codigo === c.codigo);
+  if (fila) fila.turnicidad = checked ? 1 : '';
+  renderRevisionLaboral();
 }
 
 // --- Construcción del Excel de salida, replicando el formato del modelo ---
