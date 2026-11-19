@@ -661,9 +661,12 @@ document.getElementById('alert-goto').addEventListener('click', ()=>{
 /* ======================================================================
    ARRANQUE: escucha en tiempo real de Firestore
    ====================================================================== */
-function arrancarApp(){
+async function arrancarApp(){
   buildTable();
   buildTablaPuestos();
+  // Sin inicio de sesión los datos llegan antes de que las tablas estén listas: esperar a que se construyan
+  const lista = t => new Promise(res=>{ if(t.initialized) return res(); t.on('tableBuilt', res); setTimeout(res, 4000); });
+  await Promise.all([lista(table), lista(tablaPuestos)]);
   db.collection(COL_FICHAS).onSnapshot(snap=>{
     fichas = snap.docs.map(d=>({ id:d.id, ...d.data() }));
     fichas.forEach(f=> f._dias = calcDias(f));
