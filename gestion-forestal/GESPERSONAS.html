@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GESPERSONAS | GPEX - Gestión de Fichas de Necesidad</title>
+
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+<!-- Tabulator (tema claro) -->
+<link href="https://unpkg.com/tabulator-tables@5.5.4/dist/css/tabulator_simple.min.css" rel="stylesheet">
+<script src="https://unpkg.com/tabulator-tables@5.5.4/dist/js/tabulator.min.js"></script>
+
+<!-- SheetJS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+<!-- Firebase (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+
+<style>
+  :root{
+    /* Paleta corporativa GPEX (verde institucional sobre fondo claro) */
+    --bg:#f3f8ef; --bg2:#ffffff; --bg3:#eef6e6; --border:#cfe3c2;
+    --accent:#4a7c3f; --accent2:#6aa84f; --text:#1f2a1a; --muted:#5f7a54;
+    --header-dark:#3d6b34;
+  }
+  html,body{background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif;}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-track{background:var(--bg);}
+  ::-webkit-scrollbar-thumb{background:#a9c79a;border-radius:6px;}
+  .card{background:var(--bg2); border:1px solid var(--border); border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,.05);}
+  .btn{transition:.15s; font-weight:600;}
+  .btn:active{transform:scale(0.97);}
+  .input, select.input, textarea.input{
+    background:#ffffff; border:1px solid var(--border); color:var(--text);
+    border-radius:8px; padding:8px 10px; width:100%;
+  }
+  .input:focus{outline:none; border-color:var(--accent);}
+  .tab-btn{padding:10px 18px; border-radius:10px 10px 0 0; cursor:pointer; font-weight:600; color:var(--muted); border-bottom:3px solid transparent;}
+  .tab-btn.active{color:var(--accent); border-bottom:3px solid var(--accent); background:var(--bg2);}
+  .modal-backdrop{background:rgba(20,30,15,.55); backdrop-filter:blur(2px);}
+  .badge{padding:2px 10px; border-radius:999px; font-size:12px; font-weight:700;}
+  .pill-green{background:#bfe8ab; color:#173d10;}
+  .pill-amber{background:#ffd98a; color:#5c3d00;}
+  .pill-red{background:#f7b8b6; color:#7a1815;}
+  .pill-gray{background:#d7dbd1; color:#3a4033;}
+  .pill-blue{background:#bcdcef; color:#123a56;}
+  #app{display:none;}
+  .spinner{border:3px solid var(--border);border-top:3px solid var(--accent);border-radius:50%;width:20px;height:20px;animation:spin 0.7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .tabulator{background:transparent !important; border:none !important; font-size:13px; color:var(--text) !important;}
+  .tabulator-row{background:var(--bg2) !important; border-bottom:1px solid var(--border) !important; color:var(--text) !important;}
+  .tabulator-row.tabulator-row-even{background:#f6faf3 !important;}
+  .tabulator-row:hover{background:#eaf5e2 !important;}
+  .tabulator-header{background:var(--header-dark) !important; border-bottom:1px solid var(--header-dark) !important;}
+  .tabulator-col{background:var(--header-dark) !important; color:#ffffff !important;}
+  .tabulator-col .tabulator-col-content{color:#ffffff !important;}
+  .tabulator-cell{white-space:normal !important; word-break:break-word; line-height:1.35; padding-top:8px !important; padding-bottom:8px !important; vertical-align:middle; border-right:1px solid var(--border) !important;}
+  .tabulator-col-title{white-space:normal !important; line-height:1.2;}
+  .tabulator-row .tabulator-cell.tabulator-editing{white-space:normal !important;}
+  .tabulator-row.row-tramite{border-left:8px solid #b56b00 !important; background:#ffe3ab !important;}
+  .tabulator-row.row-tramite:hover{background:#ffd685 !important;}
+  .tabulator-row.row-tramite .tabulator-cell{color:#4a3200 !important; font-weight:600;}
+  .tabulator-row.row-finalizada{border-left:8px solid #1f5c17 !important; background:#c8e9b4 !important; opacity:1;}
+  .tabulator-row.row-finalizada:hover{background:#b3dd99 !important;}
+  .tabulator-row.row-finalizada .tabulator-cell{color:#173d10 !important; font-weight:600;}
+  .tabulator-row.row-cerrada{border-left:8px solid #565d4d !important; background:#dcdfd5 !important; opacity:.9; filter:grayscale(50%);}
+  .tabulator-row.row-cerrada:hover{background:#cdd1c4 !important; opacity:1;}
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- ==================== PANTALLA DE CONFIGURACIÓN FIREBASE (solo si falta) ==================== -->
+<div id="config-screen" class="min-h-screen flex items-center justify-center p-4" style="display:none;">
+  <div class="card p-8 max-w-lg w-full">
+    <h1 class="text-xl font-bold mb-2"><i class="fa-solid fa-database mr-2 text-[var(--accent)]"></i>Configuración inicial de Firebase</h1>
+    <p class="text-sm text-[var(--muted)] mb-4">Este archivo aún no tiene credenciales de Firebase. Edita el objeto <code class="text-[var(--accent)]">firebaseConfig</code> al principio del bloque &lt;script&gt; con los datos de tu proyecto de Firebase (Firestore + Authentication con email/contraseña activados) y vuelve a abrir el archivo.</p>
+    <p class="text-xs text-[var(--muted)]">Consulta el mensaje en la consola del navegador (F12) para más detalle del error.</p>
+  </div>
+</div>
+
+<!-- ==================== LOGIN ==================== -->
+<div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
+  <div class="card p-8 max-w-sm w-full">
+    <div class="text-center mb-6">
+      <i class="fa-solid fa-people-group text-4xl text-[var(--accent)]"></i>
+      <h1 class="text-2xl font-bold mt-3">GESPERSONAS</h1>
+      <p class="text-sm text-[var(--muted)]">Fichas de Necesidad · SECONA GPEX</p>
+    </div>
+    <div id="login-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-300 rounded-lg p-2 mb-3"></div>
+    <label class="text-xs text-[var(--muted)]">Correo</label>
+    <input id="login-email" type="email" class="input mb-3" placeholder="tucorreo@gpex.es">
+    <label class="text-xs text-[var(--muted)]">Contraseña</label>
+    <input id="login-pass" type="password" class="input mb-4" placeholder="••••••••">
+    <button id="login-btn" class="btn w-full bg-[var(--accent)] hover:bg-[var(--accent2)] py-2 rounded-lg">
+      <span id="login-btn-text">Entrar</span>
+    </button>
+  </div>
+</div>
+
+<!-- ==================== APP ==================== -->
+<div id="app">
+  <!-- HEADER -->
+  <header class="border-b-4 border-[var(--accent)] bg-[var(--bg2)] px-5 py-3 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+    <div class="flex items-center gap-3">
+      <i class="fa-solid fa-people-group text-2xl text-[var(--accent)]"></i>
+      <div>
+        <h1 class="font-bold leading-tight text-[var(--accent)] tracking-wide">GESPERSONAS</h1>
+        <p class="text-xs text-[var(--muted)] leading-tight">Fichas de Necesidad · SECONA GPEX</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-4">
+      <span id="user-email" class="text-xs text-[var(--muted)] hidden sm:block"></span>
+      <button id="logout-btn" class="btn text-sm px-3 py-1.5 rounded-lg bg-[var(--bg3)] hover:bg-red-100 border border-[var(--border)]">
+        <i class="fa-solid fa-right-from-bracket mr-1"></i>Salir
+      </button>
+    </div>
+  </header>
+
+  <!-- ALERTA BAR -->
+  <div id="alert-bar" class="hidden px-5 py-2 bg-amber-50 border-b border-amber-300 text-amber-900 text-sm items-center gap-2">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <span id="alert-text"></span>
+    <button id="alert-goto" class="ml-auto underline text-amber-800">Ver pendientes</button>
+  </div>
+
+  <!-- TABS -->
+  <nav class="px-5 pt-3 flex gap-1 border-b border-[var(--border)] bg-[var(--bg)] overflow-x-auto">
+    <div class="tab-btn active" data-tab="tab-listado"><i class="fa-solid fa-table-list mr-1"></i>Listado</div>
+    <div class="tab-btn" data-tab="tab-dashboard"><i class="fa-solid fa-chart-simple mr-1"></i>Dashboard</div>
+    <div class="tab-btn" data-tab="tab-catalogo"><i class="fa-solid fa-id-card-clip mr-1"></i>Catálogo de Puestos</div>
+    <div class="tab-btn" data-tab="tab-importar"><i class="fa-solid fa-file-import mr-1"></i>Importar histórico</div>
+  </nav>
+
+  <main class="p-5">
+
+    <!-- ================= TAB LISTADO ================= -->
+    <section id="tab-listado" class="tab-content">
+      <div class="card p-4 mb-4">
+        <div class="flex flex-wrap gap-3 items-end">
+          <div class="flex-1 min-w-[200px]">
+            <label class="text-xs text-[var(--muted)]">Buscar</label>
+            <input id="f-search" class="input" placeholder="FN, trabajador, puesto, descripción...">
+          </div>
+          <div class="w-40">
+            <label class="text-xs text-[var(--muted)]">Estado</label>
+            <select id="f-estado" class="input">
+              <option value="">Todos</option>
+              <option value="">En trámite (vacío)</option>
+              <option value="FINALIZADO">FINALIZADO</option>
+              <option value="CANCELADO">CANCELADO</option>
+              <option value="ANULADO">ANULADO</option>
+              <option value="DESIERTO">DESIERTO</option>
+            </select>
+          </div>
+          <div class="w-32">
+            <label class="text-xs text-[var(--muted)]">Grupo</label>
+            <select id="f-grupo" class="input">
+              <option value="">Todos</option>
+              <option value="A">A</option><option value="B">B</option>
+              <option value="C">C</option><option value="D">D</option>
+            </select>
+          </div>
+          <div class="w-56">
+            <label class="text-xs text-[var(--muted)]">Centro de trabajo</label>
+            <select id="f-centro" class="input"><option value="">Todos</option></select>
+          </div>
+          <div class="flex gap-2">
+            <button id="btn-solo-pendientes" class="btn px-3 py-2 rounded-lg bg-[var(--bg3)] border border-[var(--border)] text-sm whitespace-nowrap">
+              <i class="fa-solid fa-hourglass-half mr-1"></i>Solo pendientes
+            </button>
+            <button id="btn-limpiar-filtros" class="btn px-3 py-2 rounded-lg bg-[var(--bg3)] border border-[var(--border)] text-sm">Limpiar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center mb-3">
+        <div class="text-sm text-[var(--muted)]"><span id="count-total">0</span> fichas</div>
+        <div class="flex gap-2">
+          <button id="btn-exportar" class="btn px-3 py-2 rounded-lg bg-[var(--bg3)] border border-[var(--border)] text-sm">
+            <i class="fa-solid fa-file-excel mr-1 text-green-700"></i>Exportar Excel
+          </button>
+          <button id="btn-nueva-ficha" class="btn px-4 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent2)] text-sm">
+            <i class="fa-solid fa-plus mr-1"></i>Nueva ficha de necesidad
+          </button>
+        </div>
+      </div>
+
+      <div id="tabla-fichas" class="card p-2"></div>
+    </section>
+
+    <!-- ================= TAB DASHBOARD ================= -->
+    <section id="tab-dashboard" class="tab-content hidden">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+        <div class="card p-4"><p class="text-xs text-[var(--muted)]">Total fichas</p><p id="kpi-total" class="text-3xl font-bold">0</p></div>
+        <div class="card p-4"><p class="text-xs text-[var(--muted)]">En trámite</p><p id="kpi-tramite" class="text-3xl font-bold text-amber-700">0</p></div>
+        <div class="card p-4"><p class="text-xs text-[var(--muted)]">Finalizadas</p><p id="kpi-finalizadas" class="text-3xl font-bold text-green-700">0</p></div>
+        <div class="card p-4"><p class="text-xs text-[var(--muted)]">Días medios de cobertura</p><p id="kpi-dias" class="text-3xl font-bold text-[var(--accent)]">0</p></div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4 mb-5">
+        <div class="card p-4"><h3 class="font-semibold mb-2 text-sm">Fichas por estado</h3><canvas id="chart-estado" height="220"></canvas></div>
+        <div class="card p-4"><h3 class="font-semibold mb-2 text-sm">Fichas por grupo profesional</h3><canvas id="chart-grupo" height="220"></canvas></div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card p-4"><h3 class="font-semibold mb-2 text-sm">Top centros de trabajo</h3><canvas id="chart-centro" height="240"></canvas></div>
+        <div class="card p-4"><h3 class="font-semibold mb-2 text-sm">Fichas abiertas (FN) por mes</h3><canvas id="chart-mes" height="240"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ================= TAB CATÁLOGO DE PUESTOS ================= -->
+    <section id="tab-catalogo" class="tab-content hidden">
+      <div class="card p-4 mb-4">
+        <p class="text-sm text-[var(--muted)] mb-3">
+          <i class="fa-solid fa-circle-info mr-1"></i>
+          El campo <b>PUESTO G.E.</b> es el identificador único de cada puesto de trabajo. Este catálogo se nutre de los
+          ficheros DATOS_PERSONAL de cada coordinador/a y es la referencia obligatoria al crear una ficha de necesidad.
+        </p>
+        <div class="flex flex-wrap gap-3 items-end">
+          <div class="flex-1 min-w-[200px]">
+            <label class="text-xs text-[var(--muted)]">Buscar</label>
+            <input id="pf-search" class="input" placeholder="Código, puesto, nombre, centro...">
+          </div>
+          <div class="w-32">
+            <label class="text-xs text-[var(--muted)]">Grupo</label>
+            <select id="pf-grupo" class="input">
+              <option value="">Todos</option>
+              <option>A</option><option>B</option><option>C</option><option>D</option>
+            </select>
+          </div>
+          <div class="w-56">
+            <label class="text-xs text-[var(--muted)]">Centro de trabajo</label>
+            <select id="pf-centro" class="input"><option value="">Todos</option></select>
+          </div>
+          <div class="w-52">
+            <label class="text-xs text-[var(--muted)]">Coordinación</label>
+            <select id="pf-coordinacion" class="input"><option value="">Todas</option></select>
+          </div>
+          <button id="pf-limpiar" class="btn px-3 py-2 rounded-lg bg-[var(--bg3)] border border-[var(--border)] text-sm">Limpiar</button>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center mb-3">
+        <div class="text-sm text-[var(--muted)]"><span id="count-puestos">0</span> puestos en catálogo</div>
+        <div class="flex gap-2 items-center">
+          <label class="btn px-3 py-2 rounded-lg bg-[var(--bg3)] border border-[var(--border)] text-sm cursor-pointer">
+            <i class="fa-solid fa-file-import mr-1 text-[var(--accent)]"></i>Importar/Actualizar desde Excel
+            <input id="input-import-puestos" type="file" accept=".xlsx,.xls" class="hidden">
+          </label>
+          <button id="btn-nuevo-puesto" class="btn px-4 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent2)] text-sm">
+            <i class="fa-solid fa-plus mr-1"></i>Nuevo puesto manual
+          </button>
+        </div>
+      </div>
+      <p id="import-puestos-status" class="text-xs text-[var(--muted)] mb-2 hidden"></p>
+
+      <div id="tabla-puestos" class="card p-2"></div>
+    </section>
+
+    <!-- ================= TAB IMPORTAR ================= -->
+    <section id="tab-importar" class="tab-content hidden">
+      <div class="card p-6 max-w-2xl">
+        <h2 class="font-bold text-lg mb-1"><i class="fa-solid fa-file-import mr-2 text-[var(--accent)]"></i>Importar histórico desde Excel</h2>
+        <p class="text-sm text-[var(--muted)] mb-4">Sube el archivo GESPERSONAS.xlsx (u otro con las mismas columnas). Las fichas se cargarán en Firebase marcadas como <b>históricas</b>. Si una ficha con el mismo número de FN ya existe, se omite para no duplicar.</p>
+        <input id="import-file" type="file" accept=".xlsx,.xls" class="input mb-4">
+        <button id="btn-importar" class="btn px-4 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent2)] text-sm" disabled>
+          <i class="fa-solid fa-upload mr-1"></i>Analizar e importar
+        </button>
+        <div id="import-progress" class="mt-4 hidden">
+          <div class="w-full bg-[var(--bg3)] rounded-full h-2 mb-2 overflow-hidden">
+            <div id="import-bar" class="bg-[var(--accent2)] h-2 rounded-full" style="width:0%"></div>
+          </div>
+          <p id="import-status" class="text-xs text-[var(--muted)]"></p>
+        </div>
+        <div id="import-log" class="mt-4 text-xs text-[var(--muted)] max-h-48 overflow-y-auto space-y-1"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ==================== MODAL FICHA (crear / editar) ==================== -->
+<div id="modal-ficha" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-40 p-4">
+  <div class="card w-full max-w-4xl max-h-[92vh] overflow-y-auto p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 id="modal-ficha-title" class="text-lg font-bold">Nueva ficha de necesidad</h2>
+      <button id="modal-ficha-close" class="text-[var(--muted)] hover:text-white text-xl">&times;</button>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="md:col-span-2">
+        <label class="text-xs text-[var(--muted)]">Descripción de la necesidad</label>
+        <input id="ff-descripcion" class="input">
+      </div>
+      <div><label class="text-xs text-[var(--muted)]">Nº FN</label><input id="ff-fn" class="input" placeholder="FN-000001/2026"></div>
+      <div><label class="text-xs text-[var(--muted)]">Fecha FN</label><input id="ff-fechafn" type="date" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">BC</label><input id="ff-bc" class="input"></div>
+      <div class="relative">
+        <label class="text-xs text-[var(--muted)]">Puesto G.E. <span class="text-[var(--accent)]">(catálogo)</span></label>
+        <input id="ff-puestoge" class="input" placeholder="Busca por código, puesto o nombre..." autocomplete="off">
+        <div id="ff-puestoge-dropdown" class="hidden absolute z-50 mt-1 w-full max-h-56 overflow-y-auto card border border-[var(--border)] shadow-xl"></div>
+        <p id="ff-puestoge-info" class="text-xs mt-1"></p>
+      </div>
+      <div><label class="text-xs text-[var(--muted)]">Encargo</label><input id="ff-encargo" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Acción</label><input id="ff-accion" class="input"></div>
+      <div>
+        <label class="text-xs text-[var(--muted)]">Grupo</label>
+        <select id="ff-grupo" class="input"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option></select>
+      </div>
+      <div><label class="text-xs text-[var(--muted)]">Denominación del puesto</label><input id="ff-denominacion" class="input"></div>
+      <div class="md:col-span-2"><label class="text-xs text-[var(--muted)]">Titulación exigida</label><input id="ff-titulacion" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Centro de trabajo</label><input id="ff-centro" class="input" list="dl-centros"></div>
+      <div><label class="text-xs text-[var(--muted)]">Dirección</label><input id="ff-direccion" class="input"></div>
+
+      <div class="md:col-span-2 border-t border-[var(--border)] my-2"></div>
+
+      <div><label class="text-xs text-[var(--muted)]">FI / FM (nº ficha incorporación)</label><input id="ff-fifm" class="input" placeholder="FI-000123/2026"></div>
+      <div><label class="text-xs text-[var(--muted)]">Fecha de alta</label><input id="ff-fechaalta" class="input" placeholder="Fecha o CANCELADO/DESIERTO..."></div>
+      <div><label class="text-xs text-[var(--muted)]">Trabajador/a</label><input id="ff-trabajador" class="input"></div>
+      <div>
+        <label class="text-xs text-[var(--muted)]">Estado</label>
+        <select id="ff-estado" class="input">
+          <option value="">En trámite</option>
+          <option value="FINALIZADO">FINALIZADO</option>
+          <option value="CANCELADO">CANCELADO</option>
+          <option value="ANULADO">ANULADO</option>
+          <option value="DESIERTO">DESIERTO</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-[var(--muted)]">Solicitud DG necesidad</label>
+        <select id="ff-solicituddg" class="input"><option value=""></option><option>SI</option><option>NO</option></select>
+      </div>
+      <div>
+        <label class="text-xs text-[var(--muted)]">Comunicación DG incorporación</label>
+        <select id="ff-comunicaciondg" class="input"><option value=""></option><option>SI</option><option>NO</option></select>
+      </div>
+      <div>
+        <label class="text-xs text-[var(--muted)]">Preinforme</label>
+        <select id="ff-preinforme" class="input"><option value=""></option><option>SI</option><option>NO</option><option>PREINF</option></select>
+      </div>
+      <div><label class="text-xs text-[var(--muted)]">Días (calculado)</label><input id="ff-dias" class="input" disabled></div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4 mt-4 border-t border-[var(--border)] pt-4">
+      <div class="card p-3">
+        <p class="text-sm font-semibold mb-2"><i class="fa-solid fa-file-pdf text-red-600 mr-1"></i>PDF Ficha de Necesidad (FN)</p>
+        <div id="pdf-fn-box" class="text-sm mb-2"></div>
+        <label class="btn text-xs px-3 py-2 rounded-lg bg-[var(--bg3)] border border-[var(--border)] text-[var(--accent)] inline-flex items-center gap-2 cursor-pointer">
+          <i class="fa-solid fa-folder-open"></i> Elegir PDF de mi equipo
+          <input id="pdf-fn-file" type="file" accept="application/pdf" class="hidden">
+        </label>
+        <p class="text-xs text-[var(--muted)] mt-1">Máximo 300 KB por archivo.</p>
+      </div>
+      <div class="card p-3">
+        <p class="text-sm font-semibold mb-2"><i class="fa-solid fa-file-pdf text-red-600 mr-1"></i>PDF Ficha de Incorporación (FI)</p>
+        <div id="pdf-fi-box" class="text-sm mb-2"></div>
+        <label class="btn text-xs px-3 py-2 rounded-lg bg-[var(--bg3)] border border-[var(--border)] text-[var(--accent)] inline-flex items-center gap-2 cursor-pointer">
+          <i class="fa-solid fa-folder-open"></i> Elegir PDF de mi equipo
+          <input id="pdf-fi-file" type="file" accept="application/pdf" class="hidden">
+        </label>
+        <p class="text-xs text-[var(--muted)] mt-1">Máximo 300 KB por archivo.</p>
+      </div>
+    </div>
+
+    <div class="flex justify-between items-center mt-6">
+      <button id="btn-eliminar-ficha" class="btn px-4 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-sm hidden">
+        <i class="fa-solid fa-trash mr-1"></i>Eliminar
+      </button>
+      <div class="flex gap-2 ml-auto">
+        <button id="btn-cancelar-ficha" class="btn px-4 py-2 rounded-lg bg-[var(--bg3)] border border-[var(--border)] text-sm">Cancelar</button>
+        <button id="btn-guardar-ficha" class="btn px-5 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent2)] text-sm">
+          <i class="fa-solid fa-floppy-disk mr-1"></i>Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ==================== MODAL PUESTO (catálogo) ==================== -->
+<div id="modal-puesto" class="fixed inset-0 modal-backdrop hidden items-center justify-center z-40 p-4">
+  <div class="card w-full max-w-3xl max-h-[92vh] overflow-y-auto p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 id="modal-puesto-title" class="text-lg font-bold">Nuevo puesto</h2>
+      <button id="modal-puesto-close" class="text-[var(--muted)] hover:text-white text-xl">&times;</button>
+    </div>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div><label class="text-xs text-[var(--muted)]">Puesto G.E. (código único)</label><input id="pp-puestoge" class="input" placeholder="E24051_1001_C02"></div>
+      <div><label class="text-xs text-[var(--muted)]">Nombre ocupante actual</label><input id="pp-nombre" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Puesto de trabajo (denominación)</label><input id="pp-puestotrabajo" class="input"></div>
+      <div>
+        <label class="text-xs text-[var(--muted)]">Grupo</label>
+        <select id="pp-grupo" class="input"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option></select>
+      </div>
+      <div><label class="text-xs text-[var(--muted)]">Centro de trabajo</label><input id="pp-centro" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Dirección</label><input id="pp-direccion" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Provincia</label><input id="pp-provincia" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Festivo local</label><input id="pp-festivolocal" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Titulación</label><input id="pp-titulacion" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Tipo de contrato</label><input id="pp-tipocontrato" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Encargo</label><input id="pp-encargo" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Acción</label><input id="pp-accion" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Coordinación</label><input id="pp-coordinacion" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Nombre del encargo</label><input id="pp-nombreencargo" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Horas</label><input id="pp-horas" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Teletrabajo</label><input id="pp-teletrabajo" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Correo</label><input id="pp-mail" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Móvil</label><input id="pp-movil" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">DNI</label><input id="pp-dni" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Código empleado</label><input id="pp-cod" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Expediente</label><input id="pp-expediente" class="input"></div>
+      <div><label class="text-xs text-[var(--muted)]">Fecha fin</label><input id="pp-fechafin" class="input"></div>
+      <div class="md:col-span-2"><label class="text-xs text-[var(--muted)]">Observaciones</label><input id="pp-obs" class="input"></div>
+    </div>
+    <div class="flex justify-between items-center mt-6">
+      <button id="btn-eliminar-puesto" class="btn px-4 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-sm hidden">
+        <i class="fa-solid fa-trash mr-1"></i>Eliminar
+      </button>
+      <div class="flex gap-2 ml-auto">
+        <button id="btn-cancelar-puesto" class="btn px-4 py-2 rounded-lg bg-[var(--bg3)] border border-[var(--border)] text-sm">Cancelar</button>
+        <button id="btn-guardar-puesto" class="btn px-5 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent2)] text-sm">
+          <i class="fa-solid fa-floppy-disk mr-1"></i>Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<datalist id="dl-centros"></datalist>
+
+<div id="toast" class="fixed bottom-5 right-5 z-50 hidden"></div>
+
+<script>
+/* ======================================================================
+   CONFIGURACIÓN DE FIREBASE
+   ----------------------------------------------------------------------
+   1) Crea un proyecto en https://console.firebase.google.com
+   2) Activa: Authentication (método Correo/Contraseña) · Firestore Database
+   3) Crea manualmente (en Authentication) las cuentas de los 2 usuarios
+      de confianza que van a usar la app.
+   4) Pega aquí abajo la configuración de tu proyecto (Configuración del
+      proyecto > Tus apps > SDK de Firebase).
+   ====================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDg73u475z0lTzfl21IeZyk85NEGoS995I",
+  authDomain: "gespersonas-5b289.firebaseapp.com",
+  projectId: "gespersonas-5b289",
+  storageBucket: "gespersonas-5b289.firebasestorage.app",
+  messagingSenderId: "658017832715",
+  appId: "1:658017832715:web:e203e92282c6171878dc0e"
+};
+
+let db, auth, currentUser = null;
+
+function initFirebase(){
+  if(!firebaseConfig.apiKey || firebaseConfig.apiKey === "TU_API_KEY_AQUI"){
+    document.getElementById('config-screen').style.display = 'flex';
+    document.getElementById('login-screen').style.display = 'none';
+    return false;
+  }
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+  auth = firebase.auth();
+  return true;
+}
+
+/* ======================================================================
+   ESTADO GLOBAL
+   ====================================================================== */
+let fichas = [];          // caché local de todas las fichas (doc.id incluido)
+let table = null;         // instancia Tabulator
+let chartEstado, chartGrupo, chartCentro, chartMes;
+let soloPendientes = false;
+let fichaActualId = null; // id del documento en edición (null = nueva)
+let puestosCatalogo = [];  // caché local del catálogo de puestos (PUESTO G.E.)
+let tablaPuestos = null;
+let puestoActualCodigo = null; // código en edición en modal-puesto (null = nuevo)
+
+/* ======================================================================
+   UTILIDADES
+   ====================================================================== */
+function toast(msg, type='ok'){
+  const el = document.getElementById('toast');
+  const color = type==='error' ? 'bg-red-600' : (type==='warn' ? 'bg-amber-600' : 'bg-green-600');
+  el.innerHTML = `<div class="${color} text-white px-4 py-2 rounded-lg shadow-lg text-sm max-w-sm">${msg}</div>`;
+  el.classList.remove('hidden');
+  clearTimeout(window.__toastTimer);
+  const duracion = type==='error' ? 8000 : 3200;
+  window.__toastTimer = setTimeout(()=> el.classList.add('hidden'), duracion);
+}
+
+// Intenta parsear distintos formatos de fecha (Date JS, string dd/mm/yyyy, string yyyy-mm-dd, serial Excel)
+function parseFecha(v){
+  if(v === null || v === undefined || v === '') return null;
+  if(v instanceof Date && !isNaN(v)) return v;
+  if(typeof v === 'number'){ // fecha serial de Excel
+    const d = XLSX.SSF.parse_date_code(v);
+    if(d) return new Date(d.y, d.m-1, d.d);
+    return null;
+  }
+  const s = String(v).trim();
+  if(!s) return null;
+  // yyyy-mm-dd (con o sin hora)
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  // dd/mm/yyyy
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(m) return new Date(+m[3], +m[2]-1, +m[1]);
+  return null; // valores como "CANCELADO", "ANULADO", "DESIERTO" no son fechas
+}
+function fmtFecha(d){
+  if(!d) return '';
+  return d.toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit', year:'numeric'});
+}
+function fechaInputValue(d){
+  if(!d) return '';
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+// Calcula días: si hay fecha de alta -> FechaAlta - FechaFN. Si no y sigue en trámite -> hoy - FechaFN
+function calcDias(f){
+  const fn = parseFecha(f.fechaFN);
+  if(!fn) return null;
+  const alta = parseFecha(f.fechaAlta);
+  const estaCerrada = f.estado && f.estado !== '';
+  if(alta) return Math.round((alta - fn) / 86400000);
+  if(estaCerrada) return null; // cerrada (cancelada/anulada/desierta) sin fecha de alta concreta
+  return Math.round((new Date() - fn) / 86400000); // sigue abierta -> días en trámite hasta hoy
+}
+
+function isPendiente(f){
+  const alta = parseFecha(f.fechaAlta);
+  return !alta && (!f.estado || f.estado === '');
+}
+
+function estadoIcono(estado){
+  if(estado === 'FINALIZADO') return '<i class="fa-solid fa-check mr-1"></i>';
+  if(estado === 'CANCELADO' || estado === 'ANULADO') return '<i class="fa-solid fa-ban mr-1"></i>';
+  if(estado === 'DESIERTO') return '<i class="fa-solid fa-triangle-exclamation mr-1"></i>';
+  return '<i class="fa-solid fa-clock mr-1"></i>'; // en trámite
+}
+function estadoPillClass(estado){
+  if(estado === 'FINALIZADO') return 'pill-green';
+  if(estado === 'CANCELADO' || estado === 'ANULADO') return 'pill-gray';
+  if(estado === 'DESIERTO') return 'pill-red';
+  return 'pill-amber'; // en trámite
+}
+function diasPillClass(dias){
+  if(dias === null || dias === undefined) return 'pill-gray';
+  if(dias <= 30) return 'pill-green';
+  if(dias <= 60) return 'pill-amber';
+  return 'pill-red';
+}
+
+/* ======================================================================
+   AUTENTICACIÓN
+   ====================================================================== */
+document.getElementById('login-btn').addEventListener('click', doLogin);
+document.getElementById('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+
+function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errBox = document.getElementById('login-error');
+  errBox.classList.add('hidden');
+  if(!email || !pass){ errBox.textContent = 'Introduce correo y contraseña.'; errBox.classList.remove('hidden'); return; }
+  document.getElementById('login-btn-text').innerHTML = '<span class="spinner inline-block align-middle"></span>';
+  auth.signInWithEmailAndPassword(email, pass)
+    .catch(err=>{
+      errBox.textContent = 'No se pudo iniciar sesión: credenciales incorrectas o usuario no dado de alta.';
+      errBox.classList.remove('hidden');
+    })
+    .finally(()=>{ document.getElementById('login-btn-text').textContent = 'Entrar'; });
+}
+
+document.getElementById('logout-btn').addEventListener('click', ()=> auth.signOut());
+
+function onAuthReady(){
+  auth.onAuthStateChanged(user=>{
+    if(user){
+      currentUser = user;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      document.getElementById('user-email').textContent = user.email;
+      arrancarApp();
+    } else {
+      currentUser = null;
+      document.getElementById('app').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'flex';
+    }
+  });
+}
+
+/* ======================================================================
+   TABS
+   ====================================================================== */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.add('hidden'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.remove('hidden');
+    if(btn.dataset.tab === 'tab-dashboard') renderDashboard();
+  });
+});
+document.getElementById('alert-goto').addEventListener('click', ()=>{
+  document.querySelector('.tab-btn[data-tab="tab-listado"]').click();
+  document.getElementById('btn-solo-pendientes').click();
+});
+
+/* ======================================================================
+   ARRANQUE: escucha en tiempo real de Firestore
+   ====================================================================== */
+function arrancarApp(){
+  buildTable();
+  buildTablaPuestos();
+  db.collection('fichas').onSnapshot(snap=>{
+    fichas = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    fichas.forEach(f=> f._dias = calcDias(f));
+    refreshCentroOptions();
+    aplicarFiltros();
+    actualizarAlertas();
+  }, err=>{
+    console.error(err);
+    toast('Error leyendo Firestore: revisa las reglas de seguridad.', 'error');
+  });
+  db.collection('puestos').onSnapshot(snap=>{
+    puestosCatalogo = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    refreshCatalogoFiltrosOptions();
+    aplicarFiltrosPuestos();
+  }, err=>{
+    console.error(err);
+    toast('Error leyendo el catálogo de puestos.', 'error');
+  });
+}
+
+function refreshCentroOptions(){
+  const centros = [...new Set(fichas.map(f=>f.centroTrabajo).filter(Boolean))].sort();
+  const sel = document.getElementById('f-centro');
+  const actual = sel.value;
+  sel.innerHTML = '<option value="">Todos</option>' + centros.map(c=>`<option>${c}</option>`).join('');
+  sel.value = actual;
+  document.getElementById('dl-centros').innerHTML = centros.map(c=>`<option value="${c}">`).join('');
+}
+
+function actualizarAlertas(){
+  const pendientes = fichas.filter(isPendiente);
+  const urgentes = pendientes.filter(f => (f._dias||0) > 60);
+  const bar = document.getElementById('alert-bar');
+  if(urgentes.length){
+    bar.classList.remove('hidden'); bar.classList.add('flex');
+    document.getElementById('alert-text').textContent =
+      `${urgentes.length} ficha(s) llevan más de 60 días en trámite sin cubrir. (${pendientes.length} pendientes en total)`;
+  } else {
+    bar.classList.add('hidden'); bar.classList.remove('flex');
+  }
+}
+
+/* ======================================================================
+   TABLA (Tabulator)
+   ====================================================================== */
+function buildTable(){
+  const abrirDesdeClick = (e, cell)=> abrirModalFicha(cell.getRow().getData().id);
+  table = new Tabulator('#tabla-fichas', {
+    data: [],
+    layout: 'fitColumns',
+    renderVertical: 'basic',
+    height: '640px',
+    placeholder: 'Sin fichas que mostrar',
+    rowFormatter:function(row){
+      const el = row.getElement();
+      const data = row.getData();
+      el.classList.remove('row-tramite','row-finalizada','row-cerrada');
+      if(!data.estado) el.classList.add('row-tramite');
+      else if(data.estado === 'FINALIZADO') el.classList.add('row-finalizada');
+      else el.classList.add('row-cerrada');
+    },
+    columns: [
+      {title:'FN', field:'fn', minWidth:95, widthGrow:1, cellClick:abrirDesdeClick},
+      {title:'Fecha FN', field:'fechaFN', minWidth:85, widthGrow:1, cellClick:abrirDesdeClick, formatter:(cell)=> fmtFecha(parseFecha(cell.getValue())) },
+      {title:'Descripción', field:'descripcion', minWidth:130, widthGrow:2, cellClick:abrirDesdeClick},
+      {title:'BC', field:'bc', minWidth:80, widthGrow:1, cellClick:abrirDesdeClick},
+      {title:'Puesto G.E.', field:'puestoGE', minWidth:110, widthGrow:1, cellClick:abrirDesdeClick},
+      {title:'Denominación puesto', field:'denominacionPuesto', minWidth:120, widthGrow:2, cellClick:abrirDesdeClick},
+      {title:'Titulación exigida', field:'titulacion', minWidth:120, widthGrow:2, cellClick:abrirDesdeClick},
+      {title:'Centro de trabajo', field:'centroTrabajo', minWidth:120, widthGrow:2, cellClick:abrirDesdeClick},
+      {title:'Trabajador/a', field:'trabajador', minWidth:100, widthGrow:1, cellClick:abrirDesdeClick},
+      {title:'Nº FI/FM', field:'fiFm', minWidth:95, widthGrow:1, editor:'input',
+        cellEdited:(cell)=> guardarCampoFicha(cell),
+        tooltip:'Haz doble clic para editar'},
+      {title:'Fecha de alta', field:'fechaAlta', minWidth:95, widthGrow:1, editor:'input',
+        formatter:(cell)=>{ const v = cell.getValue(); const d = parseFecha(v); return d ? fmtFecha(d) : (v||''); },
+        cellEdited:(cell)=> guardarCampoFicha(cell),
+        tooltip:'Haz doble clic para editar (fecha o texto como CANCELADO/DESIERTO)'},
+      {title:'Estado', field:'estado', minWidth:85, widthGrow:1, hozAlign:'center', cellClick:abrirDesdeClick, formatter:(cell)=>{
+        const v = cell.getValue() || 'EN TRÁMITE';
+        return `<span class="badge ${estadoPillClass(cell.getValue())}">${estadoIcono(cell.getValue())}${v}</span>`;
+      }},
+      {title:'Días', field:'_dias', width:55, widthGrow:0, hozAlign:'center', cellClick:abrirDesdeClick, formatter:(cell)=>{
+        const v = cell.getValue();
+        if(v===null||v===undefined) return '<span class="text-[var(--muted)]">—</span>';
+        return `<span class="badge ${diasPillClass(v)}">${v}</span>`;
+      }, sorter:'number'},
+      {title:'PDF FN', field:'pdfFNData', width:60, widthGrow:0, hozAlign:'center', headerSort:false,
+        formatter:(cell)=>{
+          const f = cell.getRow().getData();
+          if(f.pdfFNData) return '<i class="fa-solid fa-file-pdf text-red-600 text-base" title="Ver PDF de la Ficha de Necesidad"></i>';
+          if(f.pdfFNLink) return '<i class="fa-solid fa-link text-[var(--accent)] text-base" title="Ver enlace guardado de la Ficha de Necesidad"></i>';
+          return '<i class="fa-solid fa-circle-plus text-[var(--muted)] text-base" title="Adjuntar PDF de la Ficha de Necesidad"></i>';
+        },
+        cellClick:function(e, cell){
+          e.stopPropagation();
+          const f = cell.getRow().getData();
+          if(f.pdfFNData) verPdfBase64(f.pdfFNData);
+          else if(f.pdfFNLink) window.open(f.pdfFNLink, '_blank');
+          else abrirModalFicha(f.id);
+        }},
+      {title:'PDF FI', field:'pdfFIData', width:60, widthGrow:0, hozAlign:'center', headerSort:false,
+        formatter:(cell)=>{
+          const f = cell.getRow().getData();
+          if(f.pdfFIData) return '<i class="fa-solid fa-file-pdf text-[var(--accent)] text-base" title="Ver PDF de la Ficha de Incorporación"></i>';
+          if(f.pdfFILink) return '<i class="fa-solid fa-link text-[var(--accent)] text-base" title="Ver enlace guardado de la Ficha de Incorporación"></i>';
+          return '<i class="fa-solid fa-circle-plus text-[var(--muted)] text-base" title="Adjuntar PDF de la Ficha de Incorporación"></i>';
+        },
+        cellClick:function(e, cell){
+          e.stopPropagation();
+          const f = cell.getRow().getData();
+          if(f.pdfFIData) verPdfBase64(f.pdfFIData);
+          else if(f.pdfFILink) window.open(f.pdfFILink, '_blank');
+          else abrirModalFicha(f.id);
+        }},
+      {title:'', field:'edit', width:36, widthGrow:0, headerSort:false, formatter:()=>'<i class="fa-solid fa-pen text-[var(--muted)]"></i>', hozAlign:'center', cellClick:abrirDesdeClick}
+    ],
+    rowClick: (e, row)=> abrirModalFicha(row.getData().id)
+  });
+}
+
+
+
+// Guarda un único campo editado directamente desde la celda de la tabla
+async function guardarCampoFicha(cell){
+  const f = cell.getRow().getData();
+  const field = cell.getField();
+  const value = cell.getValue();
+  const cambios = {
+    [field]: value,
+    actualizadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+    actualizadoPor: currentUser ? currentUser.email : null
+  };
+  // Si al editar FI/FM o Fecha de alta quedan ambos campos rellenos y no hay
+  // un estado puesto a mano, se marca automáticamente como FINALIZADO.
+  if(field === 'fiFm' || field === 'fechaAlta'){
+    const fiFm = field === 'fiFm' ? value : f.fiFm;
+    const fechaAlta = field === 'fechaAlta' ? value : f.fechaAlta;
+    if(fiFm && fechaAlta && !f.estado){
+      cambios.estado = 'FINALIZADO';
+    }
+  }
+  try{
+    await db.collection('fichas').doc(f.id).update(cambios);
+    toast('Campo actualizado.');
+  }catch(err){
+    toast('Error al guardar: ' + err.message, 'error');
+    if(typeof cell.getOldValue === 'function') cell.setValue(cell.getOldValue(), true);
+  }
+}
+
+function aplicarFiltros(){
+  const q = document.getElementById('f-search').value.trim().toLowerCase();
+  const estado = document.getElementById('f-estado').value;
+  const grupo = document.getElementById('f-grupo').value;
+  const centro = document.getElementById('f-centro').value;
+
+  let filtradas = fichas.filter(f=>{
+    if(soloPendientes && !isPendiente(f)) return false;
+    if(estado && f.estado !== estado) return false;
+    if(estado === '' && document.getElementById('f-estado').selectedIndex===1 && f.estado) return false;
+    if(grupo && f.grupo !== grupo) return false;
+    if(centro && f.centroTrabajo !== centro) return false;
+    if(q){
+      const hay = [f.fn, f.descripcion, f.trabajador, f.denominacionPuesto, f.centroTrabajo, f.bc]
+        .filter(Boolean).join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  filtradas.sort((a,b)=> (parseFecha(b.fechaFN)||0) - (parseFecha(a.fechaFN)||0));
+  table.setData(filtradas);
+  document.getElementById('count-total').textContent = filtradas.length;
+}
+
+['f-search','f-estado','f-grupo','f-centro'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', aplicarFiltros);
+  document.getElementById(id).addEventListener('change', aplicarFiltros);
+});
+document.getElementById('btn-solo-pendientes').addEventListener('click', function(){
+  soloPendientes = !soloPendientes;
+  this.classList.toggle('bg-[var(--accent)]', soloPendientes);
+  this.classList.toggle('bg-[var(--bg3)]', !soloPendientes);
+  aplicarFiltros();
+});
+document.getElementById('btn-limpiar-filtros').addEventListener('click', ()=>{
+  document.getElementById('f-search').value='';
+  document.getElementById('f-estado').value='';
+  document.getElementById('f-grupo').value='';
+  document.getElementById('f-centro').value='';
+  soloPendientes = false;
+  document.getElementById('btn-solo-pendientes').classList.remove('bg-[var(--accent)]');
+  document.getElementById('btn-solo-pendientes').classList.add('bg-[var(--bg3)]');
+  aplicarFiltros();
+});
+
+/* ======================================================================
+   CATÁLOGO DE PUESTOS G.E. — tabla, filtros, import, CRUD
+   ====================================================================== */
+function sanitizeCodigo(s){
+  return String(s||'').trim().toUpperCase().replace(/[\/\.\#\$\[\]]/g,'_');
+}
+
+function buildTablaPuestos(){
+  const abrirDesdeClick = (e, cell)=> abrirModalPuesto(cell.getRow().getData().id);
+  tablaPuestos = new Tabulator('#tabla-puestos', {
+    data: [],
+    layout: 'fitColumns',
+    renderVertical: 'basic',
+    height: '600px',
+    placeholder: 'Sin puestos en el catálogo. Importa un archivo DATOS_PERSONAL para empezar.',
+    columns: [
+      {title:'Puesto G.E.', field:'id', minWidth:120, widthGrow:1, cellClick:abrirDesdeClick},
+      {title:'Nombre ocupante', field:'nombre', minWidth:150, widthGrow:2, cellClick:abrirDesdeClick},
+      {title:'Puesto de trabajo', field:'puestoTrabajo', minWidth:150, widthGrow:2, cellClick:abrirDesdeClick},
+      {title:'Grupo', field:'grupo', width:55, widthGrow:0, hozAlign:'center', cellClick:abrirDesdeClick},
+      {title:'Centro de trabajo', field:'centroTrabajo', minWidth:150, widthGrow:2, cellClick:abrirDesdeClick},
+      {title:'Coordinación', field:'coordinacion', minWidth:120, widthGrow:1, cellClick:abrirDesdeClick},
+      {title:'Titulación', field:'titulacion', minWidth:120, widthGrow:1, cellClick:abrirDesdeClick},
+      {title:'Origen', field:'origen', width:85, widthGrow:0, hozAlign:'center', cellClick:abrirDesdeClick, formatter:(cell)=>{
+        const v = cell.getValue()||'';
+        return v ? `<span class="badge pill-blue">${v}</span>` : '';
+      }},
+      {title:'', field:'edit', width:36, widthGrow:0, headerSort:false, formatter:()=>'<i class="fa-solid fa-pen text-[var(--muted)]"></i>', hozAlign:'center', cellClick:abrirDesdeClick}
+    ],
+    rowClick: (e, row)=> abrirModalPuesto(row.getData().id)
+  });
+}
+
+function refreshCatalogoFiltrosOptions(){
+  const centros = [...new Set(puestosCatalogo.map(p=>p.centroTrabajo).filter(Boolean))].sort();
+  const coords = [...new Set(puestosCatalogo.map(p=>p.coordinacion).filter(Boolean))].sort();
+  const selC = document.getElementById('pf-centro');
+  const selK = document.getElementById('pf-coordinacion');
+  const vc = selC.value, vk = selK.value;
+  selC.innerHTML = '<option value="">Todos</option>' + centros.map(c=>`<option>${c}</option>`).join('');
+  selK.innerHTML = '<option value="">Todas</option>' + coords.map(c=>`<option>${c}</option>`).join('');
+  selC.value = vc; selK.value = vk;
+}
+
+function aplicarFiltrosPuestos(){
+  const q = document.getElementById('pf-search').value.trim().toLowerCase();
+  const grupo = document.getElementById('pf-grupo').value;
+  const centro = document.getElementById('pf-centro').value;
+  const coord = document.getElementById('pf-coordinacion').value;
+
+  let filtrados = puestosCatalogo.filter(p=>{
+    if(grupo && p.grupo !== grupo) return false;
+    if(centro && p.centroTrabajo !== centro) return false;
+    if(coord && p.coordinacion !== coord) return false;
+    if(q){
+      const hay = [p.id, p.nombre, p.puestoTrabajo, p.centroTrabajo, p.titulacion]
+        .filter(Boolean).join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  filtrados.sort((a,b)=> a.id.localeCompare(b.id));
+  tablaPuestos.setData(filtrados);
+  document.getElementById('count-puestos').textContent = filtrados.length;
+}
+['pf-search','pf-grupo','pf-centro','pf-coordinacion'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', aplicarFiltrosPuestos);
+  document.getElementById(id).addEventListener('change', aplicarFiltrosPuestos);
+});
+document.getElementById('pf-limpiar').addEventListener('click', ()=>{
+  document.getElementById('pf-search').value='';
+  document.getElementById('pf-grupo').value='';
+  document.getElementById('pf-centro').value='';
+  document.getElementById('pf-coordinacion').value='';
+  aplicarFiltrosPuestos();
+});
+
+/* --- Modal de puesto (alta/edición manual) --- */
+const modalPuesto = document.getElementById('modal-puesto');
+const camposPP = ['nombre','puestotrabajo','grupo','centro','direccion','provincia','festivolocal','titulacion',
+  'tipocontrato','encargo','accion','coordinacion','nombreencargo','horas','teletrabajo','mail','movil','dni','cod','expediente','fechafin','obs'];
+
+function abrirModalPuesto(codigo){
+  puestoActualCodigo = codigo || null;
+  camposPP.forEach(c=> document.getElementById('pp-'+c).value = '');
+  document.getElementById('pp-puestoge').value = '';
+  document.getElementById('pp-puestoge').disabled = false;
+  document.getElementById('btn-eliminar-puesto').classList.toggle('hidden', !codigo);
+
+  if(codigo){
+    const p = puestosCatalogo.find(x=>x.id===codigo);
+    if(!p) return;
+    document.getElementById('modal-puesto-title').textContent = 'Editar puesto · ' + codigo;
+    document.getElementById('pp-puestoge').value = codigo;
+    document.getElementById('pp-puestoge').disabled = true; // el código es la clave, no se cambia en edición
+    document.getElementById('pp-nombre').value = p.nombre||'';
+    document.getElementById('pp-puestotrabajo').value = p.puestoTrabajo||'';
+    document.getElementById('pp-grupo').value = p.grupo||'';
+    document.getElementById('pp-centro').value = p.centroTrabajo||'';
+    document.getElementById('pp-direccion').value = p.direccion||'';
+    document.getElementById('pp-provincia').value = p.provincia||'';
+    document.getElementById('pp-festivolocal').value = p.festivoLocal||'';
+    document.getElementById('pp-titulacion').value = p.titulacion||'';
+    document.getElementById('pp-tipocontrato').value = p.tipoContrato||'';
+    document.getElementById('pp-encargo').value = p.encargo||'';
+    document.getElementById('pp-accion').value = p.accion||'';
+    document.getElementById('pp-coordinacion').value = p.coordinacion||'';
+    document.getElementById('pp-nombreencargo').value = p.nombreEncargo||'';
+    document.getElementById('pp-horas').value = p.horas||'';
+    document.getElementById('pp-teletrabajo').value = p.teletrabajo||'';
+    document.getElementById('pp-mail').value = p.mail||'';
+    document.getElementById('pp-movil').value = p.movil||'';
+    document.getElementById('pp-dni').value = p.dni||'';
+    document.getElementById('pp-cod').value = p.cod||'';
+    document.getElementById('pp-expediente').value = p.expediente||'';
+    document.getElementById('pp-fechafin').value = p.fechaFin||'';
+    document.getElementById('pp-obs').value = p.obs||'';
+  } else {
+    document.getElementById('modal-puesto-title').textContent = 'Nuevo puesto';
+  }
+  modalPuesto.classList.remove('hidden'); modalPuesto.classList.add('flex');
+}
+function cerrarModalPuesto(){ modalPuesto.classList.add('hidden'); modalPuesto.classList.remove('flex'); }
+document.getElementById('btn-nuevo-puesto').addEventListener('click', ()=> abrirModalPuesto(null));
+document.getElementById('modal-puesto-close').addEventListener('click', cerrarModalPuesto);
+document.getElementById('btn-cancelar-puesto').addEventListener('click', cerrarModalPuesto);
+
+document.getElementById('btn-guardar-puesto').addEventListener('click', async ()=>{
+  const codigoRaw = document.getElementById('pp-puestoge').value;
+  const codigo = sanitizeCodigo(codigoRaw);
+  if(!codigo){ toast('El código de Puesto G.E. es obligatorio.', 'error'); return; }
+  if(!puestoActualCodigo && puestosCatalogo.some(p=>p.id===codigo)){
+    toast('Ya existe un puesto con ese código. Edítalo desde la tabla.', 'error'); return;
+  }
+  const data = {
+    nombre: document.getElementById('pp-nombre').value.trim(),
+    puestoTrabajo: document.getElementById('pp-puestotrabajo').value.trim(),
+    grupo: document.getElementById('pp-grupo').value,
+    centroTrabajo: document.getElementById('pp-centro').value.trim(),
+    direccion: document.getElementById('pp-direccion').value.trim(),
+    provincia: document.getElementById('pp-provincia').value.trim(),
+    festivoLocal: document.getElementById('pp-festivolocal').value.trim(),
+    titulacion: document.getElementById('pp-titulacion').value.trim(),
+    tipoContrato: document.getElementById('pp-tipocontrato').value.trim(),
+    encargo: document.getElementById('pp-encargo').value.trim(),
+    accion: document.getElementById('pp-accion').value.trim(),
+    coordinacion: document.getElementById('pp-coordinacion').value.trim(),
+    nombreEncargo: document.getElementById('pp-nombreencargo').value.trim(),
+    horas: document.getElementById('pp-horas').value.trim(),
+    teletrabajo: document.getElementById('pp-teletrabajo').value.trim(),
+    mail: document.getElementById('pp-mail').value.trim(),
+    movil: document.getElementById('pp-movil').value.trim(),
+    dni: document.getElementById('pp-dni').value.trim(),
+    cod: document.getElementById('pp-cod').value.trim(),
+    expediente: document.getElementById('pp-expediente').value.trim(),
+    fechaFin: document.getElementById('pp-fechafin').value.trim(),
+    obs: document.getElementById('pp-obs').value.trim(),
+    origen: 'MANUAL',
+    actualizadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+    actualizadoPor: currentUser ? currentUser.email : null
+  };
+  try{
+    await db.collection('puestos').doc(codigo).set(data, {merge:true});
+    toast('Puesto guardado correctamente.');
+    cerrarModalPuesto();
+  }catch(err){
+    toast('Error al guardar: ' + err.message, 'error');
+  }
+});
+
+document.getElementById('btn-eliminar-puesto').addEventListener('click', async ()=>{
+  if(!puestoActualCodigo) return;
+  if(!confirm('¿Eliminar este puesto del catálogo? Las fichas que lo referencien no se verán afectadas, pero perderán el enlace.')) return;
+  try{
+    await db.collection('puestos').doc(puestoActualCodigo).delete();
+    toast('Puesto eliminado del catálogo.');
+    cerrarModalPuesto();
+  }catch(err){
+    toast('Error al eliminar: ' + err.message, 'error');
+  }
+});
+
+/* --- Importar catálogo desde DATOS_PERSONAL_*.xlsx --- */
+const mapaColumnasPuestos = {
+  'PUESTO G.E.':'id', 'NOMBRE':'nombre', 'COD.':'cod', 'OBS.':'obs',
+  'PUESTO TRABAJO':'puestoTrabajo', 'GRUPO':'grupo', 'CENTRO DE TRABAJO':'centroTrabajo',
+  'DIRECCIÓN':'direccion', 'FESTIVO LOCAL':'festivoLocal', 'PROVINCIA':'provincia',
+  'TIPO DE CONTRATO':'tipoContrato', 'COORDINACIÓN':'coordinacion', 'ENCARGO':'encargo',
+  'ACCIÓN':'accion', 'TITULACIÓN':'titulacion', 'TELETRABAJO':'teletrabajo', 'HORAS':'horas',
+  'MAIL':'mail', 'MÓVIL':'movil', 'DNI':'dni', 'EXPEDIENTE':'expediente',
+  'NOMBRE ENCARGO':'nombreEncargo', 'FECHA FIN':'fechaFin'
+};
+
+document.getElementById('input-import-puestos').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const status = document.getElementById('import-puestos-status');
+  status.classList.remove('hidden');
+  status.textContent = 'Analizando archivo...';
+
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array', cellDates:true});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+
+    const registros = [];
+    rows.forEach(r=>{
+      const obj = {};
+      Object.entries(mapaColumnasPuestos).forEach(([excelCol, campo])=>{
+        let v = r[excelCol];
+        if(v instanceof Date) v = fechaInputValue(v);
+        obj[campo] = (v===undefined||v===null) ? '' : String(v).trim();
+      });
+      if(obj.id) registros.push(obj);
+    });
+
+    if(!registros.length){ status.textContent = 'No se encontraron filas con PUESTO G.E. en el archivo.'; return; }
+
+    const origen = file.name.toUpperCase().includes('MARTA') ? 'MARTA'
+                  : file.name.toUpperCase().includes('MARCOS') ? 'MARCOS' : file.name;
+
+    let hechos = 0;
+    const LOTE = 400;
+    for(let i=0; i<registros.length; i+=LOTE){
+      const trozo = registros.slice(i, i+LOTE);
+      const batch = db.batch();
+      trozo.forEach(r=>{
+        const codigo = sanitizeCodigo(r.id);
+        const { id, ...resto } = r;
+        const ref = db.collection('puestos').doc(codigo);
+        batch.set(ref, {
+          ...resto,
+          origen,
+          actualizadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+          actualizadoPor: currentUser ? currentUser.email : null
+        }, {merge:true});
+      });
+      await batch.commit();
+      hechos += trozo.length;
+      status.textContent = `${hechos} / ${registros.length} puestos procesados...`;
+    }
+    status.textContent = `Catálogo actualizado: ${hechos} puestos importados/actualizados desde "${file.name}".`;
+    toast(`Catálogo actualizado: ${hechos} puestos.`);
+  }catch(err){
+    console.error(err);
+    status.textContent = 'Error al importar: ' + err.message;
+    toast('Error al importar el catálogo: ' + err.message, 'error');
+  }finally{
+    document.getElementById('input-import-puestos').value = '';
+  }
+});
+
+/* --- Autocompletado de PUESTO G.E. en la ficha de necesidad --- */
+const ffPuestoInput = document.getElementById('ff-puestoge');
+const ffPuestoDropdown = document.getElementById('ff-puestoge-dropdown');
+const ffPuestoInfo = document.getElementById('ff-puestoge-info');
+
+function buscarPuestos(q){
+  q = q.trim().toLowerCase();
+  if(!q) return [];
+  return puestosCatalogo.filter(p=>
+    p.id.toLowerCase().includes(q) ||
+    (p.puestoTrabajo||'').toLowerCase().includes(q) ||
+    (p.nombre||'').toLowerCase().includes(q) ||
+    (p.centroTrabajo||'').toLowerCase().includes(q)
+  ).slice(0, 30);
+}
+
+function pintarInfoPuesto(codigo){
+  if(!puestosCatalogo.length){
+    ffPuestoInfo.innerHTML = '<span class="text-amber-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i>El catálogo de puestos está vacío. Ve a la pestaña "Catálogo de Puestos" e impórtalo primero.</span>';
+    return;
+  }
+  const p = puestosCatalogo.find(x=>x.id===codigo);
+  if(!p){
+    ffPuestoInfo.innerHTML = codigo ? '<span class="text-amber-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Código no encontrado en el catálogo de puestos.</span>' : '';
+    return;
+  }
+  ffPuestoInfo.innerHTML = `<span class="text-green-700"><i class="fa-solid fa-check mr-1"></i>Ocupante actual: ${p.nombre||'(vacante)'} · ${p.centroTrabajo||''}</span>`;
+}
+
+ffPuestoInput.addEventListener('input', ()=>{
+  const matches = buscarPuestos(ffPuestoInput.value);
+  if(!matches.length){ ffPuestoDropdown.classList.add('hidden'); pintarInfoPuesto(sanitizeCodigo(ffPuestoInput.value)); return; }
+  ffPuestoDropdown.innerHTML = matches.map(p=>`
+    <div class="px-3 py-2 hover:bg-[var(--bg3)] cursor-pointer text-sm border-b border-[var(--border)] last:border-0" data-codigo="${p.id}">
+      <div class="font-semibold">${p.id} <span class="text-[var(--muted)] font-normal">— ${p.puestoTrabajo||''}</span></div>
+      <div class="text-xs text-[var(--muted)]">${p.nombre||'(vacante)'} · ${p.centroTrabajo||''}</div>
+    </div>`).join('');
+  ffPuestoDropdown.classList.remove('hidden');
+});
+
+ffPuestoDropdown.addEventListener('click', (e)=>{
+  const row = e.target.closest('[data-codigo]');
+  if(!row) return;
+  const p = puestosCatalogo.find(x=>x.id===row.dataset.codigo);
+  if(!p) return;
+  ffPuestoInput.value = p.id;
+  document.getElementById('ff-denominacion').value = p.puestoTrabajo||'';
+  document.getElementById('ff-grupo').value = p.grupo||'';
+  document.getElementById('ff-centro').value = p.centroTrabajo||'';
+  document.getElementById('ff-direccion').value = p.direccion||'';
+  document.getElementById('ff-titulacion').value = p.titulacion||'';
+  document.getElementById('ff-encargo').value = p.encargo||'';
+  document.getElementById('ff-accion').value = p.accion||'';
+  ffPuestoDropdown.classList.add('hidden');
+  pintarInfoPuesto(p.id);
+});
+
+document.addEventListener('click', (e)=>{
+  if(!ffPuestoInput.contains(e.target) && !ffPuestoDropdown.contains(e.target)) ffPuestoDropdown.classList.add('hidden');
+});
+
+/* ======================================================================
+   MODAL FICHA — abrir / guardar / eliminar
+   ====================================================================== */
+const modalFicha = document.getElementById('modal-ficha');
+const camposFF = ['descripcion','fn','fechafn','bc','puestoge','encargo','accion','grupo','denominacion',
+  'titulacion','centro','direccion','fifm','fechaalta','trabajador','estado','solicituddg','comunicaciondg','preinforme'];
+
+/* ----------------------------------------------------------------------
+   Adjuntos PDF (elegidos desde el equipo, guardados dentro de la propia
+   ficha en Firestore como base64 — sin depender de Firebase Storage).
+   Límite de 300 KB por archivo: cada ficha tiene 2 PDFs y un documento de
+   Firestore no puede superar 1 MB en total, así que este límite deja
+   margen de sobra para los dos PDFs más el resto de campos de la ficha.
+   ---------------------------------------------------------------------- */
+const LIMITE_PDF_BYTES = 300 * 1024;
+let pdfPendiente = { fn: null, fi: null }; // {nombre, tamano, base64} mientras no se guarda
+let pdfEliminar = { fn: false, fi: false }; // true si el usuario ha pulsado "Quitar"
+
+function formatoTamano(bytes){
+  if(bytes < 1024) return bytes + ' B';
+  return (bytes/1024).toFixed(0) + ' KB';
+}
+
+function leerArchivoBase64(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result.split(',')[1]); // quita el prefijo data:...;base64,
+    reader.onerror = ()=> reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function verPdfBase64(base64){
+  try{
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([bytes], {type:'application/pdf'}));
+    window.open(url, '_blank');
+    setTimeout(()=> URL.revokeObjectURL(url), 60000);
+  }catch(e){
+    console.error(e);
+    alert('No se ha podido abrir el PDF.');
+  }
+}
+
+function pintarCajaAdjunto(tipo){
+  const box = document.getElementById('pdf-'+tipo+'-box');
+  const pend = pdfPendiente[tipo];
+  const f = fichaActualId ? fichas.find(x=>x.id===fichaActualId) : null;
+  const guardado = f && f['pdf'+tipo.toUpperCase()+'Data'] && !pdfEliminar[tipo];
+
+  if(pend){
+    box.innerHTML = `<span class="text-[var(--accent)]"><i class="fa-solid fa-file-circle-check mr-1"></i>${pend.nombre} (${formatoTamano(pend.tamano)}) · se guardará al pulsar Guardar</span>
+      <button type="button" data-tipo="${tipo}" class="btn-quitar-pdf text-xs text-red-600 underline ml-2">Quitar</button>`;
+  } else if(guardado){
+    box.innerHTML = `<button type="button" data-tipo="${tipo}" class="btn-ver-pdf text-[var(--accent)] underline"><i class="fa-solid fa-eye mr-1"></i>Ver ${f['pdf'+tipo.toUpperCase()+'Nombre']||'PDF'} (${formatoTamano(f['pdf'+tipo.toUpperCase()+'Tamano']||0)})</button>
+      <button type="button" data-tipo="${tipo}" class="btn-quitar-pdf text-xs text-red-600 underline ml-2">Quitar</button>`;
+  } else if(f && f['pdf'+tipo.toUpperCase()+'Link']){
+    // compatibilidad con fichas antiguas que tenían un enlace externo en vez de archivo
+    box.innerHTML = `<a href="${f['pdf'+tipo.toUpperCase()+'Link']}" target="_blank" class="text-[var(--accent)] underline"><i class="fa-solid fa-link mr-1"></i>Ver enlace externo (guardado antes)</a>`;
+  } else {
+    box.innerHTML = '<span class="text-[var(--muted)]">Sin PDF adjunto</span>';
+  }
+}
+
+document.getElementById('modal-ficha').addEventListener('click', (e)=>{
+  const verBtn = e.target.closest('.btn-ver-pdf');
+  if(verBtn){
+    const tipo = verBtn.dataset.tipo;
+    const f = fichas.find(x=>x.id===fichaActualId);
+    if(f) verPdfBase64(f['pdf'+tipo.toUpperCase()+'Data']);
+    return;
+  }
+  const quitarBtn = e.target.closest('.btn-quitar-pdf');
+  if(quitarBtn){
+    const tipo = quitarBtn.dataset.tipo;
+    pdfPendiente[tipo] = null;
+    pdfEliminar[tipo] = true;
+    document.getElementById('pdf-'+tipo+'-file').value = '';
+    pintarCajaAdjunto(tipo);
+  }
+});
+
+['fn','fi'].forEach(tipo=>{
+  document.getElementById('pdf-'+tipo+'-file').addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    if(file.type !== 'application/pdf'){
+      alert('El archivo debe ser un PDF.');
+      e.target.value = '';
+      return;
+    }
+    if(file.size > LIMITE_PDF_BYTES){
+      alert(`El archivo pesa ${formatoTamano(file.size)} y el máximo es ${formatoTamano(LIMITE_PDF_BYTES)}. Comprime el PDF o escanéalo con menos calidad.`);
+      e.target.value = '';
+      return;
+    }
+    try{
+      const base64 = await leerArchivoBase64(file);
+      pdfPendiente[tipo] = { nombre: file.name, tamano: file.size, base64 };
+      pdfEliminar[tipo] = false;
+      pintarCajaAdjunto(tipo);
+    }catch(err){
+      console.error(err);
+      alert('No se ha podido leer el archivo.');
+    }
+  });
+});
+
+function limpiarModal(){
+  camposFF.forEach(c=> document.getElementById('ff-'+c).value = '');
+  document.getElementById('ff-dias').value = '';
+  document.getElementById('pdf-fn-file').value = '';
+  document.getElementById('pdf-fi-file').value = '';
+  pdfPendiente = { fn: null, fi: null };
+  pdfEliminar = { fn: false, fi: false };
+  document.getElementById('pdf-fn-box').innerHTML = '<span class="text-[var(--muted)]">Sin PDF adjunto</span>';
+  document.getElementById('pdf-fi-box').innerHTML = '<span class="text-[var(--muted)]">Sin PDF adjunto</span>';
+  document.getElementById('ff-puestoge-info').innerHTML = '';
+  document.getElementById('ff-puestoge-dropdown').classList.add('hidden');
+}
+
+function abrirModalFicha(id){
+  fichaActualId = id || null;
+  limpiarModal();
+  document.getElementById('btn-eliminar-ficha').classList.toggle('hidden', !id);
+
+  if(id){
+    const f = fichas.find(x=>x.id===id);
+    if(!f) return;
+    document.getElementById('modal-ficha-title').textContent = 'Editar ficha · ' + (f.fn||'');
+    document.getElementById('ff-descripcion').value = f.descripcion||'';
+    document.getElementById('ff-fn').value = f.fn||'';
+    document.getElementById('ff-fechafn').value = fechaInputValue(parseFecha(f.fechaFN));
+    document.getElementById('ff-bc').value = f.bc||'';
+    document.getElementById('ff-puestoge').value = f.puestoGE||'';
+    document.getElementById('ff-encargo').value = f.encargo||'';
+    document.getElementById('ff-accion').value = f.accion||'';
+    document.getElementById('ff-grupo').value = f.grupo||'';
+    document.getElementById('ff-denominacion').value = f.denominacionPuesto||'';
+    document.getElementById('ff-titulacion').value = f.titulacion||'';
+    document.getElementById('ff-centro').value = f.centroTrabajo||'';
+    document.getElementById('ff-direccion').value = f.direccion||'';
+    document.getElementById('ff-fifm').value = f.fiFm||'';
+    document.getElementById('ff-fechaalta').value = f.fechaAlta||'';
+    document.getElementById('ff-trabajador').value = f.trabajador||'';
+    document.getElementById('ff-estado').value = f.estado||'';
+    document.getElementById('ff-solicituddg').value = f.solicitudDG||'';
+    document.getElementById('ff-comunicaciondg').value = f.comunicacionDG||'';
+    document.getElementById('ff-preinforme').value = f.preinforme||'';
+    document.getElementById('ff-dias').value = f._dias ?? '';
+    pintarCajaAdjunto('fn');
+    pintarCajaAdjunto('fi');
+    if(f.puestoGE) pintarInfoPuesto(sanitizeCodigo(f.puestoGE));
+  } else {
+    document.getElementById('modal-ficha-title').textContent = 'Nueva ficha de necesidad';
+    document.getElementById('ff-fechafn').value = fechaInputValue(new Date());
+    if(!puestosCatalogo.length) pintarInfoPuesto(null);
+  }
+  modalFicha.classList.remove('hidden');
+  modalFicha.classList.add('flex');
+}
+
+function cerrarModalFicha(){
+  modalFicha.classList.add('hidden');
+  modalFicha.classList.remove('flex');
+}
+document.getElementById('btn-nueva-ficha').addEventListener('click', ()=> abrirModalFicha(null));
+document.getElementById('modal-ficha-close').addEventListener('click', cerrarModalFicha);
+document.getElementById('btn-cancelar-ficha').addEventListener('click', cerrarModalFicha);
+
+document.getElementById('btn-guardar-ficha').addEventListener('click', async ()=>{
+  const data = {
+    descripcion: document.getElementById('ff-descripcion').value.trim(),
+    fn: document.getElementById('ff-fn').value.trim(),
+    fechaFN: document.getElementById('ff-fechafn').value || null,
+    bc: document.getElementById('ff-bc').value.trim(),
+    puestoGE: sanitizeCodigo(document.getElementById('ff-puestoge').value),
+    encargo: document.getElementById('ff-encargo').value.trim(),
+    accion: document.getElementById('ff-accion').value.trim(),
+    grupo: document.getElementById('ff-grupo').value,
+    denominacionPuesto: document.getElementById('ff-denominacion').value.trim(),
+    titulacion: document.getElementById('ff-titulacion').value.trim(),
+    centroTrabajo: document.getElementById('ff-centro').value.trim(),
+    direccion: document.getElementById('ff-direccion').value.trim(),
+    fiFm: document.getElementById('ff-fifm').value.trim(),
+    fechaAlta: document.getElementById('ff-fechaalta').value.trim(),
+    trabajador: document.getElementById('ff-trabajador').value.trim(),
+    estado: document.getElementById('ff-estado').value,
+    solicitudDG: document.getElementById('ff-solicituddg').value,
+    comunicacionDG: document.getElementById('ff-comunicaciondg').value,
+    preinforme: document.getElementById('ff-preinforme').value,
+    actualizadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+    actualizadoPor: currentUser ? currentUser.email : null
+  };
+
+  // Adjuntos PDF: solo se tocan los campos que el usuario ha modificado
+  // (archivo nuevo elegido, o pulsado "Quitar"); si no se ha tocado nada,
+  // el PDF ya guardado se mantiene igual. FieldValue.delete() solo es
+  // válido si la ficha ya existe (update); en una ficha nueva simplemente
+  // no hay nada que borrar, así que se omite ese campo.
+  const esNueva = !fichaActualId;
+  ['fn','fi'].forEach(tipo=>{
+    const campo = tipo.toUpperCase();
+    if(pdfPendiente[tipo]){
+      data['pdf'+campo+'Data'] = pdfPendiente[tipo].base64;
+      data['pdf'+campo+'Nombre'] = pdfPendiente[tipo].nombre;
+      data['pdf'+campo+'Tamano'] = pdfPendiente[tipo].tamano;
+      if(!esNueva) data['pdf'+campo+'Link'] = firebase.firestore.FieldValue.delete();
+    } else if(pdfEliminar[tipo] && !esNueva){
+      data['pdf'+campo+'Data'] = firebase.firestore.FieldValue.delete();
+      data['pdf'+campo+'Nombre'] = firebase.firestore.FieldValue.delete();
+      data['pdf'+campo+'Tamano'] = firebase.firestore.FieldValue.delete();
+      data['pdf'+campo+'Link'] = firebase.firestore.FieldValue.delete();
+    }
+  });
+
+  if(!data.fn){ toast('El número de FN es obligatorio.', 'error'); return; }
+
+  // Si ya hay Nº de FI/FM y Fecha de alta, y no se ha marcado ningún estado manualmente,
+  // se considera FINALIZADO automáticamente.
+  if(!data.estado && data.fiFm && data.fechaAlta){
+    data.estado = 'FINALIZADO';
+  }
+
+  const btn = document.getElementById('btn-guardar-ficha');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner inline-block align-middle"></span> Guardando...';
+
+  try{
+    let docId = fichaActualId;
+    if(docId){
+      await db.collection('fichas').doc(docId).update(data);
+    } else {
+      data.creadoEn = firebase.firestore.FieldValue.serverTimestamp();
+      data.creadoPor = currentUser ? currentUser.email : null;
+      data.historico = false;
+      const ref = await db.collection('fichas').add(data);
+      docId = ref.id;
+    }
+
+    toast('Ficha guardada correctamente.');
+    cerrarModalFicha();
+  }catch(err){
+    console.error(err);
+    toast('Error al guardar: ' + err.message, 'error');
+  }finally{
+    btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i>Guardar';
+  }
+});
+
+// Lanza un error si la promesa no se resuelve dentro del tiempo indicado,
+// para no dejar al usuario esperando indefinidamente ante un problema de Storage/red.
+document.getElementById('btn-eliminar-ficha').addEventListener('click', async ()=>{
+  if(!fichaActualId) return;
+  if(!confirm('¿Eliminar esta ficha de forma permanente? Esta acción no se puede deshacer.')) return;
+  try{
+    await db.collection('fichas').doc(fichaActualId).delete();
+    toast('Ficha eliminada.');
+    cerrarModalFicha();
+  }catch(err){
+    toast('Error al eliminar: ' + err.message, 'error');
+  }
+});
+
+/* ======================================================================
+   EXPORTAR A EXCEL
+   ====================================================================== */
+document.getElementById('btn-exportar').addEventListener('click', ()=>{
+  const filas = table.getData().map(f=>({
+    'DESCRIPCIÓN NECESIDAD': f.descripcion||'',
+    'FN': f.fn||'',
+    'FECHA FN': f.fechaFN ? fmtFecha(parseFecha(f.fechaFN)) : '',
+    'BC': f.bc||'',
+    'PUESTO G.E.': f.puestoGE||'',
+    'ENCARGO': f.encargo||'',
+    'ACCIÓN': f.accion||'',
+    'GRUPO': f.grupo||'',
+    'DENOMINACIÓN DEL PUESTO': f.denominacionPuesto||'',
+    'TITULACIÓN EXIGIDA': f.titulacion||'',
+    'CENTRO DE TRABAJO': f.centroTrabajo||'',
+    'DIRECCIÓN': f.direccion||'',
+    'FI/FM': f.fiFm||'',
+    'FECHA DE ALTA': f.fechaAlta||'',
+    'TRABAJADOR/A': f.trabajador||'',
+    'ESTADO': f.estado||'',
+    'SOLICITUD DG NECESIDAD': f.solicitudDG||'',
+    'COMUNICACIÓN DG INCORPORACIÓN': f.comunicacionDG||'',
+    'DIAS': f._dias ?? '',
+    'PREINFORME': f.preinforme||''
+  }));
+  const ws = XLSX.utils.json_to_sheet(filas);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'GESPERSONAS');
+  XLSX.writeFile(wb, `GESPERSONAS_export_${fechaInputValue(new Date())}.xlsx`);
+});
+
+/* ======================================================================
+   IMPORTAR HISTÓRICO DESDE EXCEL
+   ====================================================================== */
+const mapaColumnas = {
+  'DESCRIPCIÓN NECESIDAD':'descripcion', 'FN':'fn', 'FECHA FN':'fechaFN', 'BC':'bc',
+  'PUESTO G.E.':'puestoGE', 'ENCARGO':'encargo', 'ACCIÓN':'accion', 'GRUPO':'grupo',
+  'DENOMINACIÓN DEL PUESTO':'denominacionPuesto', 'TITULACIÓN EXIGIDA':'titulacion',
+  'CENTRO DE TRABAJO':'centroTrabajo', 'DIRECCIÓN':'direccion', 'FI/FM':'fiFm',
+  'FECHA DE ALTA':'fechaAlta', 'TRABAJADOR/A':'trabajador', 'ESTADO':'estado',
+  'SOLICITUD DG NECESIDAD':'solicitudDG', 'COMUNICACIÓN DG INCORPORACIÓN':'comunicacionDG',
+  'DIAS':'diasOriginal', 'PREINFORME':'preinforme'
+};
+
+let importRows = [];
+document.getElementById('import-file').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  document.getElementById('btn-importar').disabled = !file;
+  if(!file) return;
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+  importRows = rows.map(r=>{
+    const obj = {};
+    Object.entries(mapaColumnas).forEach(([excelCol, campo])=>{
+      let v = r[excelCol];
+      if(v instanceof Date) v = fechaInputValue(v);
+      obj[campo] = (v===undefined || v===null) ? '' : String(v).trim();
+    });
+    return obj;
+  }).filter(r=> r.fn); // descarta filas sin nº de FN
+  log(`Archivo analizado: ${importRows.length} fichas detectadas.`);
+});
+
+function log(msg){
+  const box = document.getElementById('import-log');
+  box.innerHTML += `<div>· ${msg}</div>`;
+  box.scrollTop = box.scrollHeight;
+}
+
+document.getElementById('btn-importar').addEventListener('click', async ()=>{
+  if(!importRows.length) return;
+  const btn = document.getElementById('btn-importar');
+  btn.disabled = true;
+  document.getElementById('import-progress').classList.remove('hidden');
+  document.getElementById('import-log').innerHTML = '';
+
+  try{
+    // nº de FN ya existentes en Firestore, para no duplicar
+    const existentes = new Set(fichas.map(f=>f.fn));
+
+    const pendientes = importRows.filter(r => !existentes.has(r.fn));
+    const omitidas = importRows.length - pendientes.length;
+    if(omitidas) log(`${omitidas} ficha(s) omitidas por tener un nº de FN ya existente.`);
+
+    let hechas = 0;
+    const total = pendientes.length;
+    const LOTE = 400; // límite de Firestore por batch es 500
+
+    for(let i=0; i<pendientes.length; i+=LOTE){
+      const trozo = pendientes.slice(i, i+LOTE);
+      const batch = db.batch();
+      trozo.forEach(r=>{
+        const ref = db.collection('fichas').doc();
+        batch.set(ref, {
+          ...r,
+          historico: true,
+          importadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+          importadoPor: currentUser ? currentUser.email : null
+        });
+      });
+      await batch.commit();
+      hechas += trozo.length;
+      const pct = total ? Math.round(hechas/total*100) : 100;
+      document.getElementById('import-bar').style.width = pct + '%';
+      document.getElementById('import-status').textContent = `${hechas} / ${total} fichas importadas...`;
+    }
+
+    log(`Importación completada: ${hechas} fichas nuevas cargadas.`);
+    toast(`Importación completada: ${hechas} fichas cargadas.`);
+    importRows = [];
+    document.getElementById('import-file').value = '';
+  }catch(err){
+    console.error(err);
+    log('ERROR: ' + err.message);
+    toast('Error al importar: ' + err.message, 'error');
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+/* ======================================================================
+   DASHBOARD
+   ====================================================================== */
+function renderDashboard(){
+  const total = fichas.length;
+  const finalizadas = fichas.filter(f=>f.estado==='FINALIZADO').length;
+  const tramite = fichas.filter(isPendiente).length;
+  const diasList = fichas.map(f=>f._dias).filter(d=> d!==null && d!==undefined && d>=0);
+  const diasMedios = diasList.length ? Math.round(diasList.reduce((a,b)=>a+b,0)/diasList.length) : 0;
+
+  document.getElementById('kpi-total').textContent = total;
+  document.getElementById('kpi-tramite').textContent = tramite;
+  document.getElementById('kpi-finalizadas').textContent = finalizadas;
+  document.getElementById('kpi-dias').textContent = diasMedios;
+
+  const porEstado = {};
+  fichas.forEach(f=>{ const e = f.estado || 'EN TRÁMITE'; porEstado[e] = (porEstado[e]||0)+1; });
+
+  const porGrupo = {};
+  fichas.forEach(f=>{ const g = f.grupo || 'S/D'; porGrupo[g] = (porGrupo[g]||0)+1; });
+
+  const porCentro = {};
+  fichas.forEach(f=>{ if(f.centroTrabajo){ porCentro[f.centroTrabajo] = (porCentro[f.centroTrabajo]||0)+1; } });
+  const topCentros = Object.entries(porCentro).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  const porMes = {};
+  fichas.forEach(f=>{
+    const d = parseFecha(f.fechaFN);
+    if(!d) return;
+    const clave = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    porMes[clave] = (porMes[clave]||0)+1;
+  });
+  const mesesOrdenados = Object.keys(porMes).sort().slice(-12);
+
+  const paleta = ['#4a7c3f','#6aa84f','#8bc34a','#f0ad4e','#c0392b','#6c8ebf','#a3722c','#8e6bb0'];
+
+  if(chartEstado) chartEstado.destroy();
+  chartEstado = new Chart(document.getElementById('chart-estado'), {
+    type:'doughnut',
+    data:{ labels:Object.keys(porEstado), datasets:[{ data:Object.values(porEstado), backgroundColor:paleta }] },
+    options:{ plugins:{legend:{labels:{color:'#1f2a1a'}}} }
+  });
+
+  if(chartGrupo) chartGrupo.destroy();
+  chartGrupo = new Chart(document.getElementById('chart-grupo'), {
+    type:'bar',
+    data:{ labels:Object.keys(porGrupo), datasets:[{ label:'Fichas', data:Object.values(porGrupo), backgroundColor:'#4a7c3f' }] },
+    options:{ plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#5f7a54'}, grid:{color:'#dfe9d6'}}, y:{ticks:{color:'#5f7a54'}, grid:{color:'#dfe9d6'}} } }
+  });
+
+  if(chartCentro) chartCentro.destroy();
+  chartCentro = new Chart(document.getElementById('chart-centro'), {
+    type:'bar',
+    data:{ labels:topCentros.map(c=>c[0].length>28?c[0].slice(0,28)+'…':c[0]), datasets:[{ label:'Fichas', data:topCentros.map(c=>c[1]), backgroundColor:'#6aa84f' }] },
+    options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#5f7a54'}, grid:{color:'#dfe9d6'}}, y:{ticks:{color:'#5f7a54'}, grid:{color:'#dfe9d6'}} } }
+  });
+
+  if(chartMes) chartMes.destroy();
+  chartMes = new Chart(document.getElementById('chart-mes'), {
+    type:'line',
+    data:{ labels:mesesOrdenados, datasets:[{ label:'Fichas FN abiertas', data:mesesOrdenados.map(m=>porMes[m]), borderColor:'#4a7c3f', backgroundColor:'#4a7c3f33', fill:true, tension:.3 }] },
+    options:{ plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#5f7a54'}, grid:{color:'#dfe9d6'}}, y:{ticks:{color:'#5f7a54'}, grid:{color:'#dfe9d6'}} } }
+  });
+}
+
+/* ======================================================================
+   ARRANQUE
+   ====================================================================== */
+window.addEventListener('DOMContentLoaded', ()=>{
+  if(initFirebase()) onAuthReady();
+});
+</script>
+</body>
+</html>
