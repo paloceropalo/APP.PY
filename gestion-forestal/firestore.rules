@@ -238,6 +238,16 @@ service cloud.firestore {
         && request.resource.data.name.size() <= 300;
     }
 
+    // GESPERSONAS (fichas de necesidad y catálogo de puestos), sin inicio de sesión.
+    match /gesp_fichas/{id} {
+      allow read, delete: if true;
+      allow create, update: if request.resource.data.size() <= 200;
+    }
+    match /gesp_puestos/{id} {
+      allow read, delete: if true;
+      allow create, update: if request.resource.data.size() <= 200;
+    }
+
     // Cualquier otra colección queda cerrada.
   }
 }

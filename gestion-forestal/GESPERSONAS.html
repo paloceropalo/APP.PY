@@ -90,7 +90,7 @@
 </div>
 
 <!-- ==================== LOGIN ==================== -->
-<div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
+<div id="login-screen" class="min-h-screen flex items-center justify-center p-4" style="display:none;">
   <div class="card p-8 max-w-sm w-full">
     <div class="text-center mb-6">
       <i class="fa-solid fa-people-group text-4xl text-[var(--accent)]"></i>
@@ -120,9 +120,9 @@
       </div>
     </div>
     <div class="flex items-center gap-4">
-      <span id="user-email" class="text-xs text-[var(--muted)] hidden sm:block"></span>
-      <button id="logout-btn" class="btn text-sm px-3 py-1.5 rounded-lg bg-[var(--bg3)] hover:bg-red-100 border border-[var(--border)]">
-        <i class="fa-solid fa-right-from-bracket mr-1"></i>Salir
+      <span id="user-email" class="hidden"></span>
+      <button id="logout-btn" title="Copia una sola vez las fichas y el catálogo de puestos de la base de datos anterior (gespersonas-5b289)" class="btn text-sm px-3 py-1.5 rounded-lg bg-[var(--bg3)] hover:bg-[var(--bg2)] border border-[var(--border)]">
+        <i class="fa-solid fa-cloud-arrow-down mr-1"></i>Traer datos de la base anterior
       </button>
     </div>
   </header>
@@ -449,12 +449,23 @@
    4) Pega aquí abajo la configuración de tu proyecto (Configuración del
       proyecto > Tus apps > SDK de Firebase).
    ====================================================================== */
+// Misma base de datos que Gestión Forestal (proyecto cuadrante-secona). Sin inicio de sesión.
 const firebaseConfig = {
+  apiKey: "AIzaSyC4GTuNF806rml_rfzwvzkr_rqucfzijxo",
+  authDomain: "cuadrante-secona.firebaseapp.com",
+  projectId: "cuadrante-secona",
+  storageBucket: "cuadrante-secona.firebasestorage.app",
+  messagingSenderId: "175128885677",
+  appId: "1:175128885677:web:be910a122535a9bd4cc924"
+};
+// Colecciones de GESPERSONAS dentro de cuadrante-secona
+const COL_FICHAS = 'gesp_fichas';
+const COL_PUESTOS = 'gesp_puestos';
+// Base de datos anterior (solo para traer los datos una vez)
+const OLD_CONFIG = {
   apiKey: "AIzaSyDg73u475z0lTzfl21IeZyk85NEGoS995I",
   authDomain: "gespersonas-5b289.firebaseapp.com",
   projectId: "gespersonas-5b289",
-  storageBucket: "gespersonas-5b289.firebasestorage.app",
-  messagingSenderId: "658017832715",
   appId: "1:658017832715:web:e203e92282c6171878dc0e"
 };
 
@@ -468,7 +479,6 @@ function initFirebase(){
   }
   firebase.initializeApp(firebaseConfig);
   db = firebase.firestore();
-  auth = firebase.auth();
   return true;
 }
 
@@ -582,7 +592,38 @@ function doLogin(){
     .finally(()=>{ document.getElementById('login-btn-text').textContent = 'Entrar'; });
 }
 
-document.getElementById('logout-btn').addEventListener('click', ()=> auth.signOut());
+document.getElementById('logout-btn').addEventListener('click', migrarDatosAntiguos);
+
+// Copia las colecciones «fichas» y «puestos» del proyecto anterior a cuadrante-secona (mismos IDs)
+async function migrarDatosAntiguos(){
+  if(!confirm('Se copiarán las fichas y el catálogo de puestos de la base de datos anterior (gespersonas-5b289) a la base de datos compartida.\n\nNecesitarás el correo y la contraseña que usabas en GESPERSONAS. Solo hace falta hacerlo una vez. ¿Continuar?')) return;
+  const email = prompt('Correo con el que entrabas en GESPERSONAS:'); if(!email) return;
+  const pass = prompt('Contraseña:'); if(!pass) return;
+  const btn = document.getElementById('logout-btn'); btn.disabled = true;
+  let old;
+  try{
+    old = firebase.apps.find(a=>a.name==='gesp-antigua') || firebase.initializeApp(OLD_CONFIG, 'gesp-antigua');
+    await old.auth().signInWithEmailAndPassword(email.trim(), pass);
+    const odb = old.firestore(); let total = 0;
+    for(const [desde, hacia] of [['fichas', COL_FICHAS], ['puestos', COL_PUESTOS]]){
+      const snap = await odb.collection(desde).get();
+      for(let i=0; i<snap.docs.length; i+=300){
+        const batch = db.batch();
+        for(const d of snap.docs.slice(i, i+300)) batch.set(db.collection(hacia).doc(d.id), d.data());
+        await batch.commit();
+      }
+      total += snap.size;
+      toast(`${desde}: ${snap.size} copiados`);
+    }
+    await old.auth().signOut();
+    alert('Datos copiados: '+total+' documentos. Ya aparecen en GESPERSONAS para todos.');
+  }catch(err){
+    console.error(err);
+    const m = /auth\/(wrong-password|invalid-credential|user-not-found|invalid-email|invalid-login-credentials)/.test(err.code||'') ? 'correo o contraseña incorrectos.' :
+      (err.code==='permission-denied' ? 'faltan las reglas de gesp_fichas / gesp_puestos en cuadrante-secona.' : (err.message||err));
+    alert('No se han podido copiar los datos: '+m);
+  }finally{ btn.disabled = false; }
+}
 
 function onAuthReady(){
   auth.onAuthStateChanged(user=>{
@@ -623,7 +664,7 @@ document.getElementById('alert-goto').addEventListener('click', ()=>{
 function arrancarApp(){
   buildTable();
   buildTablaPuestos();
-  db.collection('fichas').onSnapshot(snap=>{
+  db.collection(COL_FICHAS).onSnapshot(snap=>{
     fichas = snap.docs.map(d=>({ id:d.id, ...d.data() }));
     fichas.forEach(f=> f._dias = calcDias(f));
     refreshCentroOptions();
@@ -633,7 +674,7 @@ function arrancarApp(){
     console.error(err);
     toast('Error leyendo Firestore: revisa las reglas de seguridad.', 'error');
   });
-  db.collection('puestos').onSnapshot(snap=>{
+  db.collection(COL_PUESTOS).onSnapshot(snap=>{
     puestosCatalogo = snap.docs.map(d=>({ id:d.id, ...d.data() }));
     refreshCatalogoFiltrosOptions();
     aplicarFiltrosPuestos();
@@ -766,7 +807,7 @@ async function guardarCampoFicha(cell){
     }
   }
   try{
-    await db.collection('fichas').doc(f.id).update(cambios);
+    await db.collection(COL_FICHAS).doc(f.id).update(cambios);
     toast('Campo actualizado.');
   }catch(err){
     toast('Error al guardar: ' + err.message, 'error');
@@ -982,7 +1023,7 @@ document.getElementById('btn-guardar-puesto').addEventListener('click', async ()
     actualizadoPor: currentUser ? currentUser.email : null
   };
   try{
-    await db.collection('puestos').doc(codigo).set(data, {merge:true});
+    await db.collection(COL_PUESTOS).doc(codigo).set(data, {merge:true});
     toast('Puesto guardado correctamente.');
     cerrarModalPuesto();
   }catch(err){
@@ -994,7 +1035,7 @@ document.getElementById('btn-eliminar-puesto').addEventListener('click', async (
   if(!puestoActualCodigo) return;
   if(!confirm('¿Eliminar este puesto del catálogo? Las fichas que lo referencien no se verán afectadas, pero perderán el enlace.')) return;
   try{
-    await db.collection('puestos').doc(puestoActualCodigo).delete();
+    await db.collection(COL_PUESTOS).doc(puestoActualCodigo).delete();
     toast('Puesto eliminado del catálogo.');
     cerrarModalPuesto();
   }catch(err){
@@ -1050,7 +1091,7 @@ document.getElementById('input-import-puestos').addEventListener('change', async
       trozo.forEach(r=>{
         const codigo = sanitizeCodigo(r.id);
         const { id, ...resto } = r;
-        const ref = db.collection('puestos').doc(codigo);
+        const ref = db.collection(COL_PUESTOS).doc(codigo);
         batch.set(ref, {
           ...resto,
           origen,
@@ -1366,12 +1407,12 @@ document.getElementById('btn-guardar-ficha').addEventListener('click', async ()=
   try{
     let docId = fichaActualId;
     if(docId){
-      await db.collection('fichas').doc(docId).update(data);
+      await db.collection(COL_FICHAS).doc(docId).update(data);
     } else {
       data.creadoEn = firebase.firestore.FieldValue.serverTimestamp();
       data.creadoPor = currentUser ? currentUser.email : null;
       data.historico = false;
-      const ref = await db.collection('fichas').add(data);
+      const ref = await db.collection(COL_FICHAS).add(data);
       docId = ref.id;
     }
 
@@ -1391,7 +1432,7 @@ document.getElementById('btn-eliminar-ficha').addEventListener('click', async ()
   if(!fichaActualId) return;
   if(!confirm('¿Eliminar esta ficha de forma permanente? Esta acción no se puede deshacer.')) return;
   try{
-    await db.collection('fichas').doc(fichaActualId).delete();
+    await db.collection(COL_FICHAS).doc(fichaActualId).delete();
     toast('Ficha eliminada.');
     cerrarModalFicha();
   }catch(err){
@@ -1494,7 +1535,7 @@ document.getElementById('btn-importar').addEventListener('click', async ()=>{
       const trozo = pendientes.slice(i, i+LOTE);
       const batch = db.batch();
       trozo.forEach(r=>{
-        const ref = db.collection('fichas').doc();
+        const ref = db.collection(COL_FICHAS).doc();
         batch.set(ref, {
           ...r,
           historico: true,
@@ -1591,7 +1632,8 @@ function renderDashboard(){
    ARRANQUE
    ====================================================================== */
 window.addEventListener('DOMContentLoaded', ()=>{
-  if(initFirebase()) onAuthReady();
+  document.getElementById('login-screen').style.display = 'none';
+  if(initFirebase()){ document.getElementById('app').style.display = 'block'; arrancarApp(); }
 });
 </script>
 </body>
