@@ -318,6 +318,7 @@ function startFirebase(){
  try {
   firebase.initializeApp(firebaseConfig);
   db = firebase.firestore();
+  escucharAuditorias();
   // Sin inicio de sesión: cualquiera con el enlace ve y edita los datos en tiempo real.
   setTimeout(()=>{ if(!ready && !dbError) fail({message:'sin respuesta tras 15 segundos; comprueba la conexión a internet'}); },15000);
   for (const m of ['jobs','staff']) {
@@ -1208,6 +1209,24 @@ function iguales(campo,bd,ges){
 }
 const verA=(campo,v)=>{ if(v===''||v==null) return '(vacío)'; if(campo==='leaveDate'||campo==='seniority'){ const f=fechaA(v); return /^\d{4}-\d{2}-\d{2}$/.test(f)?fmtDMY(f):String(v); } return String(v); };
 
+// Registro de auditorías (colección gf_auditorias): se muestra la última revisión
+let auditorias=[], auditoriasError='';
+function ultimaAuditoria(){ return [...auditorias].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)))[0]||null; }
+function textoUltimaAuditoria(){
+ if(auditoriasError) return 'No se puede leer el registro de auditorías ('+auditoriasError+'). Hay que publicar las reglas de Firestore (publicar_reglas.bat).';
+ const u=ultimaAuditoria(); if(!u) return 'Todavía no se ha hecho ninguna auditoría.';
+ const f=new Date(u.fecha), fecha=isNaN(f)?u.fecha:f.toLocaleDateString('es-ES')+' a las '+f.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+ return 'Última revisión: '+fecha+(u.archivo?' · '+u.archivo:'')+' · '+(u.diferencias??0)+' diferencias, '+(u.sustituidos??0)+' sustituidas, '+(u.mantenidos??0)+' mantenidas'+(u.sinRevisar?', '+u.sinRevisar+' sin revisar':'')+'.';
+}
+function pintarUltimaAuditoria(){ const b=byId('auditBtn'); if(b) b.title=textoUltimaAuditoria(); const el=byId('auditUltima'); if(el) el.textContent=textoUltimaAuditoria(); }
+function escucharAuditorias(){ db.collection('gf_auditorias').onSnapshot(snap=>{ auditorias=snap.docs.map(d=>d.data()); auditoriasError=''; pintarUltimaAuditoria(); },
+ err=>{ console.warn('Registro de auditorías:',err); auditoriasError=err.code||err.message; pintarUltimaAuditoria(); }); }
+async function guardarRegistroAuditoria(){
+ const a=audit; if(!a||!a.registro) return;
+ const reg={...a.registro,sustituidos:a.hechos,mantenidos:a.mantenidos,sinRevisar:Math.max(0,a.cambios.length-a.i),errores:a.errores,terminada:a.i>=a.cambios.length,actualizado:new Date().toISOString()};
+ try{ await db.collection('gf_auditorias').doc(reg.id).set(reg); }catch(err){ console.error('No se pudo registrar la auditoría:',err); }
+}
+
 let audit=null; // { cambios:[{cod,nombre,ids,campo,etiqueta,bd,ges}], i, hechos, mantenidos, errores, ... }
 function auditBody(html){ byId('auditBody').innerHTML=html; }
 const escA=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -1216,7 +1235,9 @@ function abrirAuditoria(){
  audit=null;
  auditBody(`<p class="import-note">Sube el Excel de trabajadores descargado de GESPERSONAS (.xls o .xlsx). Se compara con Personal adscrito por código de trabajador y se te preguntará cada diferencia, una a una. Si aceptas, se guarda el dato de GESPERSONAS.\nCampos: ${AUDIT_CAMPOS.map(c=>c[1]).join(', ')}.\nUn dato vacío en GESPERSONAS no borra el de la base de datos.</p>
   <label class="audit-file">Excel de GESPERSONAS<input type="file" id="auditFile" accept=".xls,.xlsx"></label>
-  <p id="auditMsg" role="status"></p>`);
+  <p id="auditMsg" role="status"></p>
+  <p id="auditUltima" class="audit-prog"></p>`);
+ pintarUltimaAuditoria();
  byId('auditFile').onchange=e=>{ const f=e.target.files[0]; if(f) analizarAuditoria(f); };
  byId('auditDlg').showModal();
 }
@@ -1253,6 +1274,8 @@ async function analizarAuditoria(file){
   }
   const sinExcel=[...porCod.entries()].filter(([c])=>!vistos.has(c)).map(([c,ps])=>ps[0].emp+' '+mayus(ps[0].name));
   audit={cambios,i:0,hechos:0,mantenidos:0,errores:0,sinFicha,sinExcel,trab:vistos.size,personas:new Set(cambios.map(c=>c.cod)).size};
+  audit.registro={id:globalThis.crypto.randomUUID(),fecha:new Date().toISOString(),archivo:file.name,trabajadores:vistos.size,diferencias:cambios.length,personas:audit.personas,sinFicha:sinFicha.length,sinExcel:sinExcel.length};
+  guardarRegistroAuditoria();
   resumenAuditoria();
  }catch(err){ console.error(err); msg.textContent=err.message||String(err); }
 }
@@ -1303,6 +1326,7 @@ async function aplicarAuditoria(c){
 
 function finAuditoria(){
  const a=audit, pendientes=a.cambios.length-a.i;
+ guardarRegistroAuditoria();
  auditBody(`<p class="import-note">Auditoría terminada.\n${a.hechos} datos sustituidos por los de GESPERSONAS · ${a.mantenidos} mantenidos${pendientes>0?' · '+pendientes+' sin revisar':''}${a.errores?' · '+a.errores+' no se pudieron guardar (revisa la conexión)':''}.</p>
   <div class="actions audit-actions"><button type="button" class="primary" id="auditCerrar">Cerrar</button><button type="button" id="auditOtro">Subir otro Excel</button></div>`);
  byId('auditCerrar').onclick=()=>byId('auditDlg').close();
@@ -1310,6 +1334,8 @@ function finAuditoria(){
 }
 byId('auditBtn').onclick=abrirAuditoria;
 byId('auditClose').onclick=()=>byId('auditDlg').close();
+// Al cerrar la ventana a mitad de la revisión, se registra hasta dónde se llegó
+byId('auditDlg').addEventListener('close',()=>{ if(audit&&audit.registro) guardarRegistroAuditoria(); });
 
 // ===== Importación desde «Descargar estructura (xls)» de Gestión de Encomiendas =====
 function loadXlsxLib(){
