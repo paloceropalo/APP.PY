@@ -787,7 +787,7 @@ const STAFF_COLS=[['resp','Responsable'],['puesto','Puesto G.E.'],['emp','Códig
 // Formulario de una adscripción: [campo, etiqueta, tipo, empieza fila]
 // Valores ya existentes en el personal (para los desplegables del formulario)
 // Campos que se eligen de una lista desplegable con los valores ya existentes
-const STAFF_SELECT=['role','degree','coord','center','address','holiday','hours','contract','telework','prevention','epi','resp'];
+const STAFF_SELECT=['role','degree','coord','center','address','holiday','residence','hours','contract','telework','prevention','epi','resp'];
 const STAFF_SUGGEST=['role','degree','coord','center','address','holiday','hours','contract','telework','prevention','epi','resp','obs','shared','sharedReason'];
 function staffValues(k){ const m=new Map(); for(const p of data.staff){ const v=String(p[k]??'').trim(); if(v&&!m.has(v.toLowerCase())) m.set(v.toLowerCase(),v); } return [...m.values()].sort((a,b)=>a.localeCompare(b,'es',{numeric:true})); }
 // Puestos G.E. vacantes de un encargo y acción: filas sin trabajador con código y excedencias/bajas voluntarias sin sustituto
@@ -812,6 +812,7 @@ const STAFF_FORM=[['emp','Código de empleado'],['name','Nombre y apellidos'],['
  ['center','Centro de trabajo','',true],['address','Dirección'],['holiday','Festivo local'],
  ['hours','Horas','',true],['contract','Tipo de contrato'],['telework','Teletrabajo'],
  ['prevention','Puesto de prevención','',true],['epi','Tarifa EPI'],['resp','Responsable'],
+ ['seniority','Fecha de antigüedad','fechatxt',true],['leaveDate','Fecha de baja','fechatxt'],['residence','Localidad de residencia'],
  ['obs','Obs.','',true],['obsDate','Fecha obs.'],['shared','Puesto compartido'],['sharedReason','Motivo (puesto compartido)'],
  ['titular','Titular de la plaza (si es interino/a o sustituto/a)','',true],['vacMotivo','Plaza no cubierta: observaciones (motivo)','long',true]];
 // Columnas de la tabla de personal
@@ -947,7 +948,7 @@ function openEditor(item,job,kind,person){
   if(type==='tiposel') for(const [v,t] of Object.entries(MOVE_TIPOS)) node('option',t,input).value=v;
   if(type==='personsel'){ input.setAttribute('list','staffList'); input.placeholder='Escribe el nombre o el código y elige de la lista'; input.autocomplete='off'; }
   if(type==='long') input.rows=2;
-  if(type==='fechatxt'){ input.placeholder='dd/mm/aaaa · en blanco si no se conoce'; input.autocomplete='off'; input.inputMode='numeric'; }
+  if(type==='fechatxt'){ input.placeholder='dd/mm/aaaa (opcional)'; input.autocomplete='off'; input.inputMode='numeric'; }
   input.name=id;
   if(input.tagName==='INPUT') input.type=['date','tel','email'].includes(type)?type:'text';
   if(type==='email') input.placeholder='nombre@juntaex.es'; if(type==='tel') input.placeholder='924 000 000';
@@ -960,6 +961,7 @@ function openEditor(item,job,kind,person){
   if(type==='actionsel') continue;
   if(fm==='moves'){ continue; }
   input.value=(fm==='jobs'?fieldValue(item,id):item?.[id])??(id==='job'?initialJob||(mode==='staff'&&staffJob&&staffJob!=='__none'?staffJob:'')||data.jobs[0]?.id||'':'');
+  if(fm==='staff'&&type==='fechatxt') input.value=item?.[id]?fmtDMY(item[id]):'';
  }
  if(fm==='moves'){
   const F=n=>byId('fields').querySelector('[name='+n+']');
@@ -1097,6 +1099,7 @@ byId('form').onsubmit=async event=>{
   const cand={...(editing||{}),...values}, k=dupKey(cand), other=data.staff.find(x=>x.id!==editing?.id&&dupKey(x)===k);
   if(other) return error('Esta persona ya está adscrita en el puesto '+(cand.puesto||'')+' (responsable: '+(other.resp||'—')+'). No se puede duplicar; edita el registro existente.');
  }
+ if(formMode==='staff'){ for(const [k,et] of [['seniority','antigüedad'],['leaveDate','baja']]){ if(!(k in values)) continue; const iso=parseFechaTexto(values[k]); if(iso===null) return error('La fecha de '+et+' «'+values[k]+'» no se entiende. Escríbela como dd/mm/aaaa o déjala en blanco.'); values[k]=iso; } }
  if(formMode==='staff'){ const h=String(values.hours).replace(',','.'); values.hours=h===''?'':(isNaN(Number(h))?values.hours:Number(h)); }
  const record={...(formMode==='staff'&&editing?editing:{}),...values,id:editing?.id||globalThis.crypto.randomUUID()};
  const btn=byId('form').querySelector('button.primary');btn.disabled=true;
