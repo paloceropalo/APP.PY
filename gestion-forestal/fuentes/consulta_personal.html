@@ -301,7 +301,7 @@ const numOrNull=v=>{const n=parseFloat(String(v??'').replace(',','.'));return is
 /* documento de la base de datos → registro de esta consulta */
 function fromDoc(id,d){
   const sh=txt(d.shared).toLowerCase();
-  return {id,_doc:d,resp:txt(d.resp),puestoGE:txt(d.puesto),cod:txt(d.emp),nombre:txt(d.name),vacante:/^vacante/i.test(txt(d.name)),
+  return {id,_doc:d,resp:txt(d.resp),puestoGE:txt(d.puesto),cod:txt(d.emp),nombre:txt(d.name).toLocaleUpperCase('es-ES'),vacante:/^vacante/i.test(txt(d.name)),
     obs:txt(d.obs),obsFecha:fecha(d.obsDate),mail:txt(d.email).toLowerCase(),movil:txt(d.mobile),dni:txt(d.dni).toUpperCase(),
     puesto:txt(d.role),grupo:txt(d.group).toUpperCase(),centro:txt(d.center),direccion:txt(d.address),localidad:txt(d.holiday),
     prevencion:txt(d.prevention),horas:numOrNull(d.hours),contrato:txt(d.contract),coord:txt(d.coord),
