@@ -1183,6 +1183,8 @@ function horasA(v){
  if(n>=100) n=n/100;
  return Math.round(n*100)/100;
 }
+// Asignaciones de GESPERSONAS que no son Personal adscrito (estructura y servicios comunes): fuera de la auditoría
+const AUDIT_EXCLUIR=['ES1004','ES2004'];
 const grupoA=v=>{ const m=/grupo\s*([a-e])\b/i.exec(txtA(v))||/^([a-e])$/i.exec(txtA(v)); return m?m[1].toUpperCase():txtA(v).toUpperCase(); };
 // [campo en la base de datos, etiqueta, cabecera del Excel de GESPERSONAS, valor normalizado]
 const AUDIT_CAMPOS=[
@@ -1254,14 +1256,18 @@ async function analizarAuditoria(file){
   const col=t=>head.indexOf(canonA(t));
   const faltan=AUDIT_CAMPOS.filter(c=>col(c[2])<0).map(c=>c[2]);
   if(faltan.length) throw new Error('Faltan columnas en el Excel: '+faltan.join(', '));
-  const cCod=col('Cod. Tra'), cNom=col('Nombre'), cAp1=col('Apellido 1'), cAp2=col('Apellido 2');
+  const cCod=col('Cod. Tra'), cNom=col('Nombre'), cAp1=col('Apellido 1'), cAp2=col('Apellido 2'), cAsig=col('Asignación');
+  const excluidos=[];
   const porCod=new Map();
   for(const p of data.staff){ const c=String(p.emp||'').trim().replace(/^0+/,''); if(/^\d+$/.test(c)){ if(!porCod.has(c)) porCod.set(c,[]); porCod.get(c).push(p); } }
   const cambios=[], sinFicha=[], vistos=new Set();
   for(const r of rows.slice(hi+1)){
    const cod=txtA(r[cCod]).replace(/^0+/,''); if(!/^\d+$/.test(cod)) continue;
-   vistos.add(cod);
    const nombreGes=[r[cNom],r[cAp1],r[cAp2]].map(txtA).filter(Boolean).join(' ');
+   // Solo con asignaciones ES1004/ES2004 → no se audita
+   const asigs=cAsig<0?[]:txtA(r[cAsig]).split(';').map(x=>txtA(x).split(' ')[0].toUpperCase()).filter(Boolean);
+   if(asigs.length&&asigs.every(a=>AUDIT_EXCLUIR.includes(a))){ excluidos.push(txtA(r[cCod])+' '+nombreGes+' ('+[...new Set(asigs)].join(', ')+')'); continue; }
+   vistos.add(cod);
    const recs=porCod.get(cod);
    if(!recs){ sinFicha.push(txtA(r[cCod])+' '+nombreGes); continue; }
    const p=recs[0];
@@ -1273,7 +1279,7 @@ async function analizarAuditoria(file){
    }
   }
   const sinExcel=[...porCod.entries()].filter(([c])=>!vistos.has(c)).map(([c,ps])=>ps[0].emp+' '+mayus(ps[0].name));
-  audit={cambios,i:0,hechos:0,mantenidos:0,errores:0,sinFicha,sinExcel,trab:vistos.size,personas:new Set(cambios.map(c=>c.cod)).size};
+  audit={cambios,i:0,hechos:0,mantenidos:0,errores:0,sinFicha,sinExcel,excluidos,trab:vistos.size,personas:new Set(cambios.map(c=>c.cod)).size};
   audit.registro={id:globalThis.crypto.randomUUID(),fecha:new Date().toISOString(),archivo:file.name,trabajadores:vistos.size,diferencias:cambios.length,personas:audit.personas,sinFicha:sinFicha.length,sinExcel:sinExcel.length};
   guardarRegistroAuditoria();
   resumenAuditoria();
@@ -1289,6 +1295,7 @@ function resumenAuditoria(){
  auditBody(`<p class="import-note">${a.trab} trabajadores en el Excel de GESPERSONAS.\n${a.cambios.length?`${a.cambios.length} diferencias en ${a.personas} personas: ${Object.entries(porCampo).map(([k,n])=>k+' '+n).join(' · ')}.`:'No hay diferencias en los campos comparados.'}</p>
   ${listaA('En GESPERSONAS pero sin adscripción en la base de datos',a.sinFicha)}
   ${listaA('En la base de datos pero no en el Excel de GESPERSONAS',a.sinExcel)}
+  ${listaA('Excluidos por asignación '+AUDIT_EXCLUIR.join(' / '),a.excluidos)}
   <div class="actions audit-actions">${a.cambios.length?'<button type="button" class="primary" id="auditStart">Revisar los cambios uno a uno</button>':''}<button type="button" id="auditOtro">Subir otro Excel</button></div>`);
  if(a.cambios.length) byId('auditStart').onclick=preguntaAuditoria;
  byId('auditOtro').onclick=abrirAuditoria;
