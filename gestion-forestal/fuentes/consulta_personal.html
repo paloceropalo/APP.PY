@@ -307,6 +307,7 @@ function fromDoc(id,d){
     prevencion:txt(d.prevention),horas:numOrNull(d.hours),contrato:txt(d.contract),coord:txt(d.coord),
     encargoKey:txt(d.jobKey),encargoNombre:txt(d.actionText),titulacion:txt(d.degree),teletrabajo:txt(d.telework),tarifa:txt(d.epi),
     expediente:txt(d.exp),nombreEncargo:txt(d.jobName),fechaFin:fecha(d.jobEnd),
+    antiguedad:fecha(d.seniority),fechaBaja:fecha(d.leaveDate),residencia:txt(d.residence),
     rol:d.cpRol!==undefined?txt(d.cpRol):(sh==='titular'||sh==='sustituto'?sh:''),motivo:d.cpMotivo!==undefined?txt(d.cpMotivo):txt(d.sharedReason),
     ...(d.cpOrig&&Object.keys(d.cpOrig).length?{orig:{...d.cpOrig}}:{})};
 }
@@ -315,6 +316,7 @@ function toDoc(b,rv){
   const d={...b._doc,id:b.id,name:b.nombre,puesto:b.puestoGE,emp:b.cod,obs:b.obs,obsDate:dmy(b.obsFecha),email:b.mail,mobile:b.movil,dni:b.dni,
     role:b.puesto,group:b.grupo,center:b.centro,address:b.direccion,holiday:b.localidad,prevention:b.prevencion,hours:b.horas==null?'':b.horas,
     contract:b.contrato,coord:b.coord,degree:b.titulacion,telework:b.teletrabajo,epi:b.tarifa,
+    seniority:b.antiguedad||'',leaveDate:b.fechaBaja||'',residence:b.residencia||'',
     cpRol:b.rol||'',cpMotivo:b.motivo||'',shared:rv?(ROL[rv.rolEf]||(rv.compartido.length?'Sin determinar':'')):txt(b._doc.shared),sharedReason:rv?rv.motivoEf:txt(b._doc.sharedReason)};
   if(b.orig&&Object.keys(b.orig).length)d.cpOrig=b.orig; else delete d.cpOrig;
   if(typeof d.job!=='string')d.job='';
@@ -349,7 +351,8 @@ const FACETS=[
  {id:'teletrabajo',label:'Teletrabajo',get:r=>r.teletrabajo},
  {id:'coord',label:'Coordinación',get:r=>r.coord},
  {id:'obs',label:'Observaciones',get:r=>r.obs},
- {id:'prevencion',label:'Puesto de prevención',get:r=>r.prevencion}
+ {id:'prevencion',label:'Puesto de prevención',get:r=>r.prevencion},
+ {id:'residencia',label:'Localidad de residencia',get:r=>r.residencia}
 ];
 function compText(r){
   if(!r.compartido.length)return '';
@@ -377,7 +380,10 @@ const COLS=[
  {id:'dni',label:'DNI',val:r=>r.dni},
  {id:'titulacion',label:'Titulación',val:r=>r.titulacion},
  {id:'prevencion',label:'Puesto de prevención',val:r=>r.prevencion},
- {id:'fechaFin',label:'Fin del encargo',val:r=>r.fechaFin}
+ {id:'fechaFin',label:'Fin del encargo',val:r=>r.fechaFin},
+ {id:'antiguedad',label:'Fecha de antigüedad',val:r=>r.antiguedad},
+ {id:'fechaBaja',label:'Fecha de baja',val:r=>r.fechaBaja},
+ {id:'residencia',label:'Localidad de residencia',val:r=>r.residencia}
 ];
 const S={resp:'',terms:[],q:'',off:{},sort:{col:'puestoGE',dir:1},cols:new Set(lsGet('cp_cols2',COLS.filter(c=>c.on).map(c=>c.id))),cur:null,edit:false,pop:null,order:[]};
 /* Orden de las columnas (editable; se recuerda en este navegador). «Puesto G.E.» y «Nombre» quedan fijas al principio. */
@@ -437,7 +443,7 @@ function rebuild(){
   });
   ALL.forEach(r=>{
     r.hay=canon([r.nombre,r.cod,r.cod.replace(/^0+/,''),r.puestoGE,r.dni,r.mail,r.movil,r.puesto,r.centro,r.direccion,r.localidad,r.coord,
-      r.encargoKey,r.encargoNombre,r.contrato,r.titulacion,r.obs,r.prevencion,r.teletrabajo,r.resp,r.vacante?'vacante':'',r.motivoEf,ROL[r.rolEf]||''].join(' '));
+      r.encargoKey,r.encargoNombre,r.contrato,r.titulacion,r.obs,r.prevencion,r.teletrabajo,r.resp,r.residencia,r.vacante?'vacante':'',r.motivoEf,ROL[r.rolEf]||''].join(' '));
     r.f={}; FACETS.forEach(f=>r.f[f.id]=canon(f.get(r)||''));
   });
   FACETS.forEach(f=>{
@@ -552,6 +558,7 @@ function cell(r,c,i){
     case 'resp': return `<td><span class="pill ${esc(pillCls(r.resp))}">${esc(r.resp)}</span></td>`;
     case 'horas': return `<td>${r.horas==null?dash:fmtH(r.horas)}</td>`;
     case 'fechaFin': return `<td>${r.fechaFin?fmtFecha(r.fechaFin):dash}</td>`;
+    case 'antiguedad': case 'fechaBaja': return `<td>${r[c.id]?fmtFecha(r[c.id]):dash}</td>`;
     default: { const v=c.val(r); return `<td${cl} title="${esc(v)}">${val(v)}</td>`; }
   }
 }
@@ -645,19 +652,19 @@ $('#btnCols').addEventListener('click',e=>{
 });
 
 /* ============ Ficha lateral (consulta y edición) ============ */
-const DL={puesto:'puesto',centro:'centro',localidad:'localidad',contrato:'contrato',coord:'coord',teletrabajo:'teletrabajo',prevencion:'prevencion',obs:'obs',encargoKey:'encargo'};
+const DL={puesto:'puesto',centro:'centro',localidad:'localidad',contrato:'contrato',coord:'coord',teletrabajo:'teletrabajo',prevencion:'prevencion',obs:'obs',encargoKey:'encargo',residencia:'residencia'};
 /* [campo, etiqueta, tipo(t texto, d fecha, n número, g grupo), opciones] */
 const SECCIONES=[
  ['Identificación',[['nombre','Nombre','t',{soloEdicion:1}],['puestoGE','Puesto G.E.','t',{copy:1}],['cod','Código','t'],['obs','Observación','t'],['obsFecha','Fecha obs.','d',{soloSiObs:1}]]],
- ['Contacto',[['mail','Correo','t',{copy:1,href:'mailto:'}],['movil','Móvil','t',{copy:1,href:'tel:'}],['dni','DNI','t',{copy:1}]]],
- ['Puesto',[['puesto','Puesto de trabajo','t'],['grupo','Grupo','g'],['horas','Jornada (horas)','n'],['contrato','Tipo de contrato','t'],['teletrabajo','Teletrabajo','t'],['titulacion','Titulación','t']]],
+ ['Contacto',[['mail','Correo','t',{copy:1,href:'mailto:'}],['movil','Móvil','t',{copy:1,href:'tel:'}],['dni','DNI','t',{copy:1}],['residencia','Localidad de residencia','t']]],
+ ['Puesto',[['puesto','Puesto de trabajo','t'],['grupo','Grupo','g'],['horas','Jornada (horas)','n'],['contrato','Tipo de contrato','t'],['teletrabajo','Teletrabajo','t'],['titulacion','Titulación','t'],['antiguedad','Fecha de antigüedad','d'],['fechaBaja','Fecha de baja','d']]],
  ['Centro de trabajo',[['centro','Centro','t'],['direccion','Dirección','t'],['localidad','Festivo local','t']]],
  ['Encargo',[['encargoKey','Encargo','t',{ro:1}],['encargoNombre','Acción','t',{ro:1}],['nombreEncargo','Nombre del encargo','t',{ro:1}],['expediente','Expediente','t',{ro:1}],['fechaFin','Fin del encargo','d',{ro:1}],['coord','Coordinación','t']]],
  ['Prevención',[['prevencion','Puesto prevención','t'],['tarifa','Tarifa EPI','t']]]
 ];
 function viewVal(r,k){
   if(k==='horas')return fmtH(r.horas);
-  if(k==='obsFecha'||k==='fechaFin')return fmtFecha(r[k]);
+  if(k==='obsFecha'||k==='fechaFin'||k==='antiguedad'||k==='fechaBaja')return fmtFecha(r[k]);
   if(k==='obs')return r.obs?(r.obs+(OBS_LEYENDA[r.obs]?' – '+OBS_LEYENDA[r.obs]:'')):'';
   return r[k];
 }
@@ -801,7 +808,7 @@ $('#btnExport').addEventListener('click',()=>{
     'Correo':r.mail,'Móvil':r.movil,'DNI':r.dni,'Puesto de trabajo':r.puesto,'Grupo':r.grupo,'Centro de trabajo':r.centro,'Dirección':r.direccion,
     'Festivo local':r.localidad,'Puesto de prevención':r.prevencion,'Horas':r.horas==null?'':r.horas,'Tipo de contrato':r.contrato,'Coordinación':r.coord,
     'Encargo':r.encargoKey,'Acción':r.encargoNombre,'Titulación':r.titulacion,'Teletrabajo':r.teletrabajo,'Tarifa EPI':r.tarifa,
-    'Expediente':r.expediente,'Nombre del encargo':r.nombreEncargo,'Fin del encargo':fmtFecha(r.fechaFin),'Editado en la app':editado(r)?'Sí':''}));
+    'Expediente':r.expediente,'Nombre del encargo':r.nombreEncargo,'Fin del encargo':fmtFecha(r.fechaFin),'Fecha de antigüedad':fmtFecha(r.antiguedad),'Fecha de baja':fmtFecha(r.fechaBaja),'Localidad de residencia':r.residencia,'Editado en la app':editado(r)?'Sí':''}));
   const ws=XLSX.utils.json_to_sheet(data);
   ws['!cols']=Object.keys(data[0]||{}).map(k=>({wch:Math.min(45,Math.max(10,k.length+2,...data.slice(0,60).map(d=>String(d[k]).length)))}));
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Personal');
